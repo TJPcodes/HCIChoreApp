@@ -6,6 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
 
 import HomeScreen     from '../screens/HomeScreen';
+import ActivityScreen from '../screens/ActivityScreen';
+import AddChoreScreen from '../screens/AddChoreScreen';
+
 
 const Tab   = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -15,9 +18,28 @@ function HomeStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen name="HomeMain" component={HomeScreen}  options={{ title: 'ChoreSync' }} />
+      <Stack.Screen name="AddChore" component={AddChoreScreen} options={{ title: 'Add Chore' }} />
     </Stack.Navigator>
   );
 }
+
+function PersonalStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen name="PersonalMain" component={PersonalScreen} options={{ title: 'My Chores' }} />
+    </Stack.Navigator>
+  );
+}
+
+function ActivityStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen name="ActivityMain" component={ActivityScreen} options={{ title: 'Activity' }} />
+      <Stack.Screen name="AddChore"     component={AddChoreScreen} options={{ title: 'Add Chore' }} />
+    </Stack.Navigator>
+  );
+}
+
 
 // ── Main Tab Navigator ───────────────────────────────────────────────────────
 
@@ -47,6 +69,7 @@ export default function AppNavigator() {
         },
       })}
     >
+      <Tab.Screen name="Activity" component={ActivityStack} />
       <Tab.Screen name="Home"     component={HomeStack}     />
     </Tab.Navigator>
   );
