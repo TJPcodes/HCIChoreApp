@@ -8,6 +8,7 @@ import { Colors } from '../theme';
 import HomeScreen     from '../screens/HomeScreen';
 import ActivityScreen from '../screens/ActivityScreen';
 import AddChoreScreen from '../screens/AddChoreScreen';
+import GroupScreen from '../screens/GroupScreen';
 
 
 const Tab   = createBottomTabNavigator();
@@ -36,6 +37,15 @@ function ActivityStack() {
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen name="ActivityMain" component={ActivityScreen} options={{ title: 'Activity' }} />
       <Stack.Screen name="AddChore"     component={AddChoreScreen} options={{ title: 'Add Chore' }} />
+    </Stack.Navigator>
+  );
+}
+
+function GroupStack() {
+  return (
+    <Stack.Navigator screenOptions={stackOptions}>
+      <Stack.Screen name="GroupMain" component={GroupScreen}  options={{ title: 'Apartment' }} />
+      <Stack.Screen name="AddChore"  component={AddChoreScreen} options={{ title: 'Add Chore' }} />
     </Stack.Navigator>
   );
 }
@@ -71,6 +81,7 @@ export default function AppNavigator() {
     >
       <Tab.Screen name="Activity" component={ActivityStack} />
       <Tab.Screen name="Home"     component={HomeStack}     />
+      <Tab.Screen name="Group" component={GroupStack} />
     </Tab.Navigator>
   );
 }
