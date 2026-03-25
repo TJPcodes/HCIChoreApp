@@ -9,6 +9,7 @@ import HomeScreen     from '../screens/HomeScreen';
 import ActivityScreen from '../screens/ActivityScreen';
 import AddChoreScreen from '../screens/AddChoreScreen';
 import GroupScreen from '../screens/GroupScreen';
+import PersonalScreen from '../screens/PersonalScreen';
 
 
 const Tab   = createBottomTabNavigator();
@@ -82,6 +83,7 @@ export default function AppNavigator() {
       <Tab.Screen name="Activity" component={ActivityStack} />
       <Tab.Screen name="Home"     component={HomeStack}     />
       <Tab.Screen name="Group" component={GroupStack} />
+      <Tab.Screen name="Personal" component={PersonalStack} />
     </Tab.Navigator>
   );
 }
