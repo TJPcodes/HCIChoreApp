@@ -9,6 +9,7 @@ import HomeScreen     from '../screens/HomeScreen';
 import ActivityScreen from '../screens/ActivityScreen';
 import AddChoreScreen from '../screens/AddChoreScreen';
 import GroupScreen from '../screens/GroupScreen';
+import SwitchGroupScreen from '../screens/SwitchGroupScreen';
 import PersonalScreen from '../screens/PersonalScreen';
 
 
@@ -45,8 +46,9 @@ function ActivityStack() {
 function GroupStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
-      <Stack.Screen name="GroupMain" component={GroupScreen}  options={{ title: 'Apartment' }} />
+      <Stack.Screen name="GroupMain" component={GroupScreen}  options={{ title: 'Group' }} />
       <Stack.Screen name="AddChore"  component={AddChoreScreen} options={{ title: 'Add Chore' }} />
+      <Stack.Screen name="SwitchGroup" component={SwitchGroupScreen} options={{ title: 'Switch Group' }} />
     </Stack.Navigator>
   );
 }
