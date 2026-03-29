@@ -1,27 +1,37 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
 import { Card, SectionHeader, GhostButton } from '../components/shared';
-import { MOCK_CHORES, MOCK_GROUP, CURRENT_USER, ChoreStatus, getUserById } from '../models/data';
+import { useApp } from '../context/AppContext';
+import { ChoreStatus } from '../models/data';
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-const CHORE_DAYS = [null, null, 'Dishes', null, 'Trash', null, 'Bath'];
-const DONE_DAYS  = [true, true, false, false, false, false, false];
 
 export default function HomeScreen({ navigation }) {
-  const [chores, setChores] = useState(MOCK_CHORES);
-  const myChores   = chores.filter(c => c.assigneeId === CURRENT_USER.id);
-  const nextChore  = myChores.find(c => c.status === ChoreStatus.PENDING);
-  const overdueCount = chores.filter(c => c.status === ChoreStatus.OVERDUE).length;
-  const dueSoonCount = chores.filter(c => c.status === ChoreStatus.PENDING).length;
+  const { chores, currentUserId, getUserById, markComplete } = useApp();
 
-  function markDone(chore) {
-    setChores(prev => prev.map(c => c.id === chore.id ? { ...c, status: ChoreStatus.COMPLETED } : c));
-  }
+  const currentUser = getUserById(currentUserId);
+  const myChores    = chores.filter(c => c.assigneeId === currentUserId);
+  const nextChore   = myChores.find(c => c.status === ChoreStatus.PENDING || c.status === 'pending');
+  const overdueCount = chores.filter(c => c.status === ChoreStatus.OVERDUE || c.status === 'overdue').length;
+  const dueSoonCount = chores.filter(c => c.status === ChoreStatus.PENDING || c.status === 'pending').length;
+
+  // Build weekly strip from real chore data
+  const dayMap = { 'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6 };
+  const choreDays = Array(7).fill(null);
+  const doneDays  = Array(7).fill(false);
+
+  myChores.forEach(c => {
+    const idx = dayMap[c.dueDateStart];
+    if (idx !== undefined) {
+      choreDays[idx] = c.name.length > 5 ? c.name.slice(0, 4) : c.name;
+      doneDays[idx]  = c.status === ChoreStatus.COMPLETED || c.status === 'completed';
+    }
+  });
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -29,7 +39,7 @@ export default function HomeScreen({ navigation }) {
       {/* Greeting */}
       <View style={styles.greeting}>
         <Text style={styles.greetingSub}>Welcome back,</Text>
-        <Text style={styles.greetingName}>{CURRENT_USER.name} 👋</Text>
+        <Text style={styles.greetingName}>{currentUser.name} 👋</Text>
       </View>
 
       {/* Status Banner */}
@@ -50,15 +60,15 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.dayLabel}>{day}</Text>
             <View style={[
               styles.dayCell,
-              DONE_DAYS[i]    && styles.dayCellDone,
-              CHORE_DAYS[i] && !DONE_DAYS[i] && styles.dayCellPending,
+              doneDays[i]    && styles.dayCellDone,
+              choreDays[i] && !doneDays[i] && styles.dayCellPending,
             ]}>
               <Text style={[
                 styles.dayCellText,
-                DONE_DAYS[i] && { color: Colors.green },
-                CHORE_DAYS[i] && !DONE_DAYS[i] && { color: Colors.accent },
+                doneDays[i] && { color: Colors.green },
+                choreDays[i] && !doneDays[i] && { color: Colors.accent },
               ]}>
-                {DONE_DAYS[i] ? '✓' : CHORE_DAYS[i] || ''}
+                {doneDays[i] ? '✓' : choreDays[i] || ''}
               </Text>
             </View>
           </View>
@@ -77,7 +87,7 @@ export default function HomeScreen({ navigation }) {
                   {nextChore.dueDateStart} – {nextChore.dueDateEnd}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.doneBtn} onPress={() => markDone(nextChore)} activeOpacity={0.8}>
+              <TouchableOpacity style={styles.doneBtn} onPress={() => markComplete(nextChore.id)} activeOpacity={0.8}>
                 <Text style={styles.doneBtnText}>Mark Done ✓</Text>
               </TouchableOpacity>
             </View>

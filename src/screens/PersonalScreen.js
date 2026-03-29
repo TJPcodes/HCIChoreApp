@@ -1,32 +1,25 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { Colors, Typography, Radius } from '../theme';
 import { Card, SectionHeader, ProgressRing } from '../components/shared';
-import { MOCK_CHORES, CURRENT_USER, ChoreStatus } from '../models/data';
+import { useApp } from '../context/AppContext';
 
 export default function PersonalScreen() {
-  const [chores, setChores] = useState(
-    MOCK_CHORES.filter(c => c.assigneeId === CURRENT_USER.id)
-  );
+  const { chores, currentUserId, markComplete } = useApp();
 
-  const dueToday = chores.filter(c => c.status === ChoreStatus.PENDING);
-  const overdue = chores.filter(c => c.status === ChoreStatus.OVERDUE);
-  const done = chores.filter(c => c.status === ChoreStatus.COMPLETED);
-  const total = chores.length;
+  const myChores = chores.filter(c => c.assigneeId === currentUserId);
+  const dueToday = myChores.filter(c => c.status === 'pending');
+  const overdue  = myChores.filter(c => c.status === 'overdue');
+  const done     = myChores.filter(c => c.status === 'completed');
+  const total    = myChores.length;
   const progress = total > 0 ? done.length / total : 0;
 
-  function markComplete(chore) {
-    setChores(prev =>
-      prev.map(c => c.id === chore.id ? { ...c, status: ChoreStatus.COMPLETED } : c)
-    );
-  }
-
   function renderChore(chore) {
-    const isComplete = chore.status === ChoreStatus.COMPLETED;
+    const isComplete = chore.status === 'completed';
     return (
-      <Card key={chore.id} overdue={chore.status === ChoreStatus.OVERDUE}>
+      <Card key={chore.id} overdue={chore.status === 'overdue'}>
         <View style={styles.choreRow}>
           <View style={styles.choreInfo}>
             <Text style={[styles.choreName, isComplete && styles.strikethrough]}>
@@ -37,7 +30,7 @@ export default function PersonalScreen() {
               {chore.autoRotate ? '  🔄 auto-rotate' : ''}
             </Text>
           </View>
-          <TouchableOpacity onPress={() => markComplete(chore)} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => markComplete(chore.id)} activeOpacity={0.7}>
             <Text style={{ fontSize: 26 }}>
               {isComplete ? '✅' : '⭕'}
             </Text>

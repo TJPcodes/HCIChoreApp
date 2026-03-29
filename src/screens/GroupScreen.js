@@ -5,32 +5,43 @@ import {
 } from 'react-native';
 import { Colors, Typography, Radius } from '../theme';
 import { Card, Avatar, StatusBadge, ProgressRing, SectionHeader } from '../components/shared';
-import { MOCK_CHORES, MOCK_GROUP, ChoreStatus, getUserById } from '../models/data';
+import { useApp } from '../context/AppContext';
 
 export default function GroupScreen({ navigation }) {
-  const [chores, setChores] = useState(MOCK_CHORES);
+  const {
+    chores, users, activeGroupId, groups,
+    getUserById, getChoresForGroup, markComplete, sendNudge,
+  } = useApp();
+
   const [nudged, setNudged] = useState({});
 
-  const completed = chores.filter(c => c.status === ChoreStatus.COMPLETED).length;
-  const total     = chores.length;
+  const activeGroup  = groups.find(g => g.id === activeGroupId);
+  const groupChores  = activeGroupId ? getChoresForGroup(activeGroupId) : chores;
+  const groupMembers = activeGroup
+    ? users.filter(u => activeGroup.memberIds.includes(u.id))
+    : users;
+
+  const completed = groupChores.filter(c => c.status === 'completed').length;
+  const total     = groupChores.length;
   const progress  = total > 0 ? completed / total : 0;
 
-  function sendNudge(chore) {
+  function handleNudge(chore) {
     setNudged(prev => ({ ...prev, [chore.id]: true }));
+    sendNudge(chore);
     Alert.alert('Nudge sent 👋', `An anonymous reminder was sent about "${chore.name}".`);
   }
 
   function renderChore({ item: chore }) {
     const user   = getUserById(chore.assigneeId);
-    const isOver = chore.status === ChoreStatus.OVERDUE;
+    const isOver = chore.status === 'overdue';
     return (
       <Card overdue={isOver} style={styles.choreCard}>
         <View style={styles.choreRow}>
           {/* Chore status dot. */}
           <View style={[styles.dot, {
             backgroundColor:
-              chore.status === ChoreStatus.COMPLETED ? Colors.green :
-              chore.status === ChoreStatus.OVERDUE   ? Colors.red   : Colors.orange,
+              chore.status === 'completed' ? Colors.green :
+              chore.status === 'overdue'   ? Colors.red   : Colors.orange,
           }]} />
 
           {/* Info about the chore. */}
@@ -48,12 +59,12 @@ export default function GroupScreen({ navigation }) {
           </View>
 
           {/* Right side. */}
-          {chore.status === ChoreStatus.COMPLETED ? (
+          {chore.status === 'completed' ? (
             <StatusBadge status="completed" />
           ) : (
             <TouchableOpacity
               style={[styles.nudgeBtn, nudged[chore.id] && styles.nudgeBtnSent]}
-              onPress={() => sendNudge(chore)}
+              onPress={() => handleNudge(chore)}
               activeOpacity={0.7}
             >
               <Text style={[styles.nudgeBtnText, nudged[chore.id] && { color: Colors.muted }]}>
@@ -66,12 +77,14 @@ export default function GroupScreen({ navigation }) {
     );
   }
 
+  const groupName = activeGroup ? activeGroup.name : 'Apartment';
+
   return (
     <View style={styles.container}>
       {/* Group header. */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.groupName}>🏠 {MOCK_GROUP.name}</Text>
+          <Text style={styles.groupName}>🏠 {groupName}</Text>
           <Text style={styles.headerSub}>{completed}/{total} tasks completed this week</Text>
         </View>
         <ProgressRing progress={progress} size={52} />
@@ -79,7 +92,7 @@ export default function GroupScreen({ navigation }) {
 
       {/* Avatars for members. */}
       <View style={styles.membersRow}>
-        {MOCK_GROUP.members.map(m => (
+        {groupMembers.map(m => (
           <View key={m.id} style={styles.memberItem}>
             <Avatar name={m.name} color={m.color} size={36} />
             <Text style={styles.memberName}>{m.name}</Text>
@@ -89,10 +102,15 @@ export default function GroupScreen({ navigation }) {
 
       {/* List of chores. */}
       <FlatList
-        data={chores}
+        data={groupChores}
         keyExtractor={c => c.id}
         renderItem={renderChore}
         contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyText}>No chores yet — add one below!</Text>
+          </View>
+        }
         ListFooterComponent={
           <TouchableOpacity
             style={styles.addBtn}
@@ -142,4 +160,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md, padding: 14, alignItems: 'center', marginTop: 4,
   },
   addBtnText:  { color: Colors.accent, fontWeight: '600', fontSize: 14 },
+  emptyWrap:   { padding: 32, alignItems: 'center' },
+  emptyText:   { ...Typography.body, color: Colors.muted, textAlign: 'center' },
 });
