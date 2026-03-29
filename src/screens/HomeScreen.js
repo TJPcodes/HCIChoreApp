@@ -12,7 +12,10 @@ import { ChoreStatus } from '../models/data';
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export default function HomeScreen({ navigation }) {
-  const { chores, currentUserId, getUserById, markComplete } = useApp();
+  const {
+    chores, currentUserId, getUserById, markComplete,
+    isDemoLoaded, loadDemoData, clearAll,
+  } = useApp();
 
   const currentUser = getUserById(currentUserId);
   const myChores    = chores.filter(c => c.assigneeId === currentUserId);
@@ -36,7 +39,24 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      {/* Greeting */}
+      {/* ── Dev Mode Banner ──────────────────────────────────────────── */}
+      <View style={styles.devBanner}>
+        <View style={styles.devLabelRow}>
+          <Ionicons name="construct" size={14} color={Colors.orange} />
+          <Text style={styles.devLabel}>DEV MODE</Text>
+        </View>
+        {isDemoLoaded ? (
+          <TouchableOpacity style={styles.devBtnClear} onPress={clearAll} activeOpacity={0.7}>
+            <Text style={styles.devBtnClearText}>Clear Demo Data</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.devBtnLoad} onPress={loadDemoData} activeOpacity={0.7}>
+            <Text style={styles.devBtnLoadText}>Load Demo Data</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* ── Greeting ─────────────────────────────────────────────────── */}
       <View style={styles.greeting}>
         <Text style={styles.greetingSub}>Welcome back,</Text>
         <Text style={styles.greetingName}>{currentUser.name} 👋</Text>
@@ -123,6 +143,27 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.bg },
   content:      { padding: 20, paddingBottom: 40 },
+
+  /* Dev banner */
+  devBanner:    {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: Colors.orange + '14', borderWidth: 1, borderColor: Colors.orange + '44',
+    borderRadius: Radius.sm, padding: 10, marginBottom: 16,
+  },
+  devLabelRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  devLabel:     { ...Typography.micro, color: Colors.orange },
+  devBtnLoad:   {
+    backgroundColor: Colors.accent, borderRadius: Radius.sm,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  devBtnLoadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  devBtnClear:  {
+    backgroundColor: Colors.red + '22', borderWidth: 1, borderColor: Colors.red + '55',
+    borderRadius: Radius.sm, paddingHorizontal: 12, paddingVertical: 6,
+  },
+  devBtnClearText: { color: Colors.red, fontSize: 11, fontWeight: '700' },
+
+  /* Rest of styles */
   greeting:     { marginBottom: 16 },
   greetingSub:  { ...Typography.subhead, color: Colors.muted },
   greetingName: { ...Typography.largeTitle, color: Colors.text },

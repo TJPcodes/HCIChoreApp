@@ -1,6 +1,9 @@
 // src/context/AppContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  MOCK_CHORES, MOCK_USERS, MOCK_GROUP, MOCK_ACTIVITY,
+} from '../models/data';
 
 const AppContext = createContext(null);
 
@@ -13,10 +16,25 @@ const EMPTY_STATE = {
     { id: 'u2', name: 'Zach',   color: '#34C78A' },
     { id: 'u3', name: 'Wilson', color: '#F5A623' },
   ],
-  groups: [],           // { id, name, memberIds }
-  chores: [],           // { id, name, groupId, assigneeId, frequency, autoRotate, dueDateStart, dueDateEnd, status }
-  activity: [],         // { id, type, msg, time }
+  groups: [],
+  chores: [],
+  activity: [],
   activeGroupId: null,
+};
+
+const DEMO_STATE = {
+  currentUserId: 'u1',
+  users: MOCK_USERS.map(u => ({ id: u.id, name: u.name, color: u.color })),
+  groups: [
+    {
+      id:        MOCK_GROUP.id,
+      name:      MOCK_GROUP.name,
+      memberIds: MOCK_USERS.map(u => u.id),
+    },
+  ],
+  chores:        [...MOCK_CHORES],
+  activity:      [...MOCK_ACTIVITY],
+  activeGroupId: MOCK_GROUP.id,
 };
 
 export function AppProvider({ children }) {
@@ -66,7 +84,8 @@ export function AppProvider({ children }) {
     setState(prev => ({ ...prev, activity: [event, ...prev.activity] }));
   }
 
-  // Actions 
+  // Actions
+
   function createGroup(name) {
     const group = {
       id:        Date.now().toString(),
@@ -130,15 +149,25 @@ export function AppProvider({ children }) {
     addActivity(`Anonymous nudge sent about "${chore.name}"`, 'nudge');
   }
 
+  // ── Dev / Demo helpers ──────────────────────────────────────────────────
+
+  function loadDemoData() {
+    setState(DEMO_STATE);
+  }
+
   function clearAll() {
     setState(EMPTY_STATE);
   }
+
+  /** True when demo data is currently loaded (checks for the mock group id) */
+  const isDemoLoaded = state.groups.some(g => g.id === MOCK_GROUP.id);
 
   // Context Value
 
   const value = {
     ...state,
     loaded,
+    isDemoLoaded,
     getUserById,
     getActiveGroup,
     getChoresForGroup,
@@ -150,6 +179,7 @@ export function AppProvider({ children }) {
     markComplete,
     deleteChore,
     sendNudge,
+    loadDemoData,
     clearAll,
   };
 
