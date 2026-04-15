@@ -8,6 +8,18 @@ import {
 const AppContext = createContext(null);
 
 const STORAGE_KEY = 'choresync_data';
+const MOCK_CHORE_ID_SET = new Set(MOCK_CHORES.map(c => c.id));
+
+function attachMockGroupToLegacyMockChores(chores) {
+  if (!Array.isArray(chores)) return [];
+
+  return chores.map(chore => {
+    if (!chore?.groupId && MOCK_CHORE_ID_SET.has(chore.id)) {
+      return { ...chore, groupId: MOCK_GROUP.id };
+    }
+    return chore;
+  });
+}
 
 const EMPTY_STATE = {
   currentUserId: 'u1',
@@ -45,7 +57,14 @@ export function AppProvider({ children }) {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then(raw => {
       if (raw) {
-        try { setState(JSON.parse(raw)); } catch (_) {}
+        try {
+          const parsed = JSON.parse(raw);
+          setState(prev => ({
+            ...prev,
+            ...parsed,
+            chores: attachMockGroupToLegacyMockChores(parsed.chores),
+          }));
+        } catch (_) {}
       }
       setLoaded(true);
     });
@@ -102,7 +121,30 @@ export function AppProvider({ children }) {
   }
 
   function switchGroup(groupId) {
-    setState(prev => ({ ...prev, activeGroupId: groupId }));
+    setState(prev => {
+      const hasGroup = prev.groups.some(g => g.id === groupId);
+      const migratedChores =
+        groupId === MOCK_GROUP.id
+          ? attachMockGroupToLegacyMockChores(prev.chores)
+          : prev.chores;
+
+      if (hasGroup || groupId !== MOCK_GROUP.id) {
+        return { ...prev, chores: migratedChores, activeGroupId: groupId };
+      }
+
+      const startupGroup = {
+        id: MOCK_GROUP.id,
+        name: MOCK_GROUP.name,
+        memberIds: prev.users.map(u => u.id),
+      };
+
+      return {
+        ...prev,
+        chores: migratedChores,
+        groups: [startupGroup, ...prev.groups],
+        activeGroupId: groupId,
+      };
+    });
   }
 
   function deleteGroup(groupId) {

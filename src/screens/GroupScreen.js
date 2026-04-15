@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, Alert,
 } from 'react-native';
 import { Colors, Typography, Radius } from '../theme';
-import { Card, Avatar, StatusBadge, ProgressRing, SectionHeader } from '../components/shared';
+import { Card, Avatar, StatusBadge, ProgressRing } from '../components/shared';
 import { useApp } from '../context/AppContext';
 
 export default function GroupScreen({ navigation }) {
   const {
     chores, users, activeGroupId, groups,
-    getUserById, getChoresForGroup, markComplete, sendNudge,
+    getUserById, getChoresForGroup, sendNudge,
   } = useApp();
 
   const [nudged, setNudged] = useState({});
@@ -24,6 +24,11 @@ export default function GroupScreen({ navigation }) {
   const completed = groupChores.filter(c => c.status === 'completed').length;
   const total     = groupChores.length;
   const progress  = total > 0 ? completed / total : 0;
+  const groupName = activeGroup ? activeGroup.name : 'Group';
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: groupName });
+  }, [navigation, groupName]);
 
   function handleNudge(chore) {
     setNudged(prev => ({ ...prev, [chore.id]: true }));
@@ -77,8 +82,6 @@ export default function GroupScreen({ navigation }) {
     );
   }
 
-  const groupName = activeGroup ? activeGroup.name : 'Apartment';
-
   return (
     <View style={styles.container}>
       {/* Group header. */}
@@ -112,13 +115,25 @@ export default function GroupScreen({ navigation }) {
           </View>
         }
         ListFooterComponent={
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => navigation.navigate('AddChore')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.addBtnText}>+ Add Chore</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => navigation.navigate('AddChore')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addBtnText}>+ Add Chore</Text>
+            </TouchableOpacity>
+
+            <View style={styles.footerGap} />
+
+            <TouchableOpacity
+              style={styles.switchGroupBtn}
+              onPress={() => navigation.navigate('SwitchGroup')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.switchGroupBtnText}>🔄 Switch Group</Text>
+            </TouchableOpacity>
+          </>
         }
       />
     </View>
@@ -160,6 +175,13 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md, padding: 14, alignItems: 'center', marginTop: 4,
   },
   addBtnText:  { color: Colors.accent, fontWeight: '600', fontSize: 14 },
+  footerGap:   { height: 46 },
+  switchGroupBtn: {
+    borderWidth: 1, borderColor: Colors.text + '66',
+    borderRadius: Radius.md, padding: 14, alignItems: 'center',
+    backgroundColor: Colors.card,
+  },
+  switchGroupBtnText: { color: Colors.text, fontWeight: '600', fontSize: 14 },
   emptyWrap:   { padding: 32, alignItems: 'center' },
   emptyText:   { ...Typography.body, color: Colors.muted, textAlign: 'center' },
 });

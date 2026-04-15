@@ -66,6 +66,10 @@ npm install babel-preset-expo
 npx expo install --fix
 ```
 
+```powershell
+npx expo install @react-native-async-storage/async-storage
+```
+
 ---
 
 ### Step 6 — Start the app

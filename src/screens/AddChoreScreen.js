@@ -1,30 +1,78 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity,
   StyleSheet, Switch, Alert,
 } from 'react-native';
 import { Colors, Typography, Radius } from '../theme';
 import { PrimaryButton } from '../components/shared';
-import { MOCK_USERS, ChoreFrequency } from '../models/data';
+import { useApp } from '../context/AppContext';
+import { ChoreFrequency } from '../models/data';
 
 const FREQUENCIES = Object.values(ChoreFrequency);
 
 export default function AddChoreScreen({ navigation }) {
+  const { users, groups, activeGroupId, currentUserId, addChore } = useApp();
+
+  const activeGroup = groups.find(g => g.id === activeGroupId) || null;
+  const assignableUsers = useMemo(() => {
+    if (activeGroup) {
+      return users.filter(u => activeGroup.memberIds.includes(u.id));
+    }
+    return users;
+  }, [activeGroup, users]);
+
   const [name,           setName]           = useState('');
   const [frequency,      setFrequency]      = useState(ChoreFrequency.WEEKLY);
   const [autoRotate,     setAutoRotate]     = useState(true);
-  const [selectedUser,   setSelectedUser]   = useState(MOCK_USERS[0].id);
+  const [selectedUser,   setSelectedUser]   = useState(currentUserId);
   const [reminderOn,     setReminderOn]     = useState(true);
   const [dueDateStart,   setDueDateStart]   = useState('Mon');
   const [dueDateEnd,     setDueDateEnd]     = useState('Wed');
+
+  useEffect(() => {
+    const selectedIsValid = assignableUsers.some(u => u.id === selectedUser);
+    if (!selectedIsValid) {
+      const fallback = assignableUsers[0]?.id || currentUserId;
+      setSelectedUser(fallback);
+    }
+  }, [assignableUsers, selectedUser, currentUserId]);
+
+  function normalizeDayLabel(value) {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const firstThree = trimmed.slice(0, 3);
+    return firstThree.charAt(0).toUpperCase() + firstThree.slice(1).toLowerCase();
+  }
 
   function handleSave() {
     if (!name.trim()) {
       Alert.alert('Missing name', 'Please enter a chore name.');
       return;
     }
-    // TODO: persist to state/service
-    Alert.alert('Chore saved!', `"${name}" was added to the group.`, [
+
+    const start = normalizeDayLabel(dueDateStart);
+    const end = normalizeDayLabel(dueDateEnd);
+
+    if (!start || !end) {
+      Alert.alert('Missing due window', 'Please provide both start and end days.');
+      return;
+    }
+
+    const fallbackAssignee = assignableUsers[0]?.id || currentUserId;
+    const assigneeId = selectedUser || fallbackAssignee;
+
+    addChore({
+      name: name.trim(),
+      frequency,
+      autoRotate,
+      assigneeId,
+      dueDateStart: start,
+      dueDateEnd: end,
+      reminderOn,
+    });
+
+    const groupLabel = activeGroup ? ` in ${activeGroup.name}` : '';
+    Alert.alert('Chore saved!', `"${name.trim()}" was added${groupLabel}.`, [
       { text: 'OK', onPress: () => navigation.goBack() },
     ]);
   }
@@ -99,7 +147,7 @@ export default function AddChoreScreen({ navigation }) {
         <>
           <Text style={styles.inputLabel}>Assign to</Text>
           <View style={styles.chipRow}>
-            {MOCK_USERS.map(u => (
+            {assignableUsers.map(u => (
               <TouchableOpacity
                 key={u.id}
                 style={[styles.chip, selectedUser === u.id && { ...styles.chipActive, borderColor: u.color, backgroundColor: u.color + '22' }]}
