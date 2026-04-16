@@ -8,16 +8,16 @@ const AppContext = createContext(null);
 
 function choreFromDb(row) {
   return {
-    id:           row.id,
-    name:         row.name,
-    assigneeId:   row.assignee_id,
-    groupId:      row.group_id,
-    frequency:    row.frequency,
-    autoRotate:   row.auto_rotate,
-    dueDateStart: row.due_date_start,
-    dueDateEnd:   row.due_date_end,
-    status:       row.status,
-    startWeekOffset: row.start_week_offset,
+    id:              row.id,
+    name:            row.name,
+    assigneeId:      row.assignee_id,
+    groupId:         row.group_id,
+    frequency:       row.frequency,
+    autoRotate:      row.auto_rotate,
+    dueDateStart:    row.due_date_start,
+    dueDateEnd:      row.due_date_end,
+    status:          row.status,
+    startWeekOffset: row.start_week_offset ?? 0,
   };
 }
 
@@ -360,16 +360,16 @@ export function AppProvider({ children }) {
     const { data: newChore, error } = await supabase
       .from('chores')
       .insert({
-        name:           chore.name,
-        group_id:       groupId,
-        assignee_id:    chore.assigneeId || state.currentUserId,
-        frequency:      chore.frequency || 'Weekly',
-        auto_rotate:    chore.autoRotate ?? true,
-        due_date_start: chore.dueDateStart || 'Mon',
-        due_date_end:   chore.dueDateEnd || 'Wed',
-        status:         'pending',
-        created_by:     state.currentUserId,
+        name:              chore.name,
+        group_id:          groupId,
+        assignee_id:       chore.assigneeId || state.currentUserId,
+        frequency:         chore.frequency || 'Weekly',
+        auto_rotate:       chore.autoRotate ?? true,
+        due_date_start:    chore.dueDateStart || 'Mon',
+        due_date_end:      chore.dueDateEnd || 'Wed',
         start_week_offset: chore.startWeekOffset ?? 0,
+        status:            'pending',
+        created_by:        state.currentUserId,
       })
       .select()
       .single();

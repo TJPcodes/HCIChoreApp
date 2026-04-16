@@ -7,17 +7,34 @@ import { Colors, Typography, Radius } from '../theme';
 import { Card, SectionHeader, ProgressRing } from '../components/shared';
 import { useApp } from '../context/AppContext';
 
+// Friendly label for a scheduled-future chore
+function upcomingLabel(offset) {
+  if (offset === 1) return 'Starts next week';
+  return `Starts in ${offset} weeks`;
+}
+
 export default function PersonalScreen() {
   const { getMyChores, groups, markComplete } = useApp();
 
   // All chores assigned to me from any group OR personal
   const myChores = getMyChores();
 
-  const dueToday = myChores.filter(c => c.status === 'pending');
-  const overdue  = myChores.filter(c => c.status === 'overdue');
-  const done     = myChores.filter(c => c.status === 'completed');
-  const total    = myChores.length;
-  const progress = total > 0 ? done.length / total : 0;
+  // Separate out upcoming chores (scheduled for a future week)
+  const isUpcoming = c => (c.startWeekOffset ?? 0) > 0;
+  const isThisWeek = c => (c.startWeekOffset ?? 0) === 0;
+
+  const dueThisWeek = myChores.filter(c => isThisWeek(c) && c.status === 'pending');
+  const overdue     = myChores.filter(c => isThisWeek(c) && c.status === 'overdue');
+  const done        = myChores.filter(c => c.status === 'completed');
+  const upcoming    = myChores
+    .filter(c => isUpcoming(c) && c.status !== 'completed')
+    .sort((a, b) => a.startWeekOffset - b.startWeekOffset);
+
+  // Progress reflects only this-week work, not scheduled-future chores
+  const thisWeekChores = myChores.filter(c => isThisWeek(c));
+  const progress = thisWeekChores.length > 0
+    ? done.filter(isThisWeek).length / thisWeekChores.length
+    : 0;
 
   function groupLabel(chore) {
     if (chore.groupId === null) return 'Personal';
@@ -52,6 +69,27 @@ export default function PersonalScreen() {
     );
   }
 
+  // Upcoming chores: dimmed, no "complete" control (not actionable yet)
+  function renderUpcomingChore(chore) {
+    return (
+      <Card key={chore.id} style={styles.upcomingCard}>
+        <View style={styles.choreRow}>
+          <View style={styles.choreInfo}>
+            <Text style={[styles.choreName, { color: Colors.muted }]}>
+              {chore.name}
+            </Text>
+            <Text style={styles.choreDue}>
+              📅 {upcomingLabel(chore.startWeekOffset)} · {chore.dueDateStart}–{chore.dueDateEnd}
+            </Text>
+            <Text style={styles.choreSource}>
+              {chore.groupId === null ? '👤' : '🏠'} {groupLabel(chore)}
+            </Text>
+          </View>
+        </View>
+      </Card>
+    );
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
@@ -59,13 +97,15 @@ export default function PersonalScreen() {
         <ProgressRing progress={progress} size={72} />
         <View style={styles.progressText}>
           <Text style={styles.progressTitle}>My Chores</Text>
-          <Text style={styles.progressSub}>{done.length} of {total} complete this week</Text>
+          <Text style={styles.progressSub}>
+            {done.filter(isThisWeek).length} of {thisWeekChores.length} complete this week
+          </Text>
         </View>
       </View>
 
-      <SectionHeader title="☀️  Due / Upcoming" color={Colors.orange} />
-      {dueToday.length > 0
-        ? dueToday.map(renderChore)
+      <SectionHeader title="☀️  Due This Week" color={Colors.orange} />
+      {dueThisWeek.length > 0
+        ? dueThisWeek.map(renderChore)
         : <Text style={styles.emptyText}>Nothing pending 🎉</Text>
       }
 
@@ -73,6 +113,12 @@ export default function PersonalScreen() {
       {overdue.length > 0
         ? overdue.map(renderChore)
         : <Text style={styles.emptyText}>Nothing overdue 🎉</Text>
+      }
+
+      <SectionHeader title="📅  Upcoming" color={Colors.accent} style={{ marginTop: 16 }} />
+      {upcoming.length > 0
+        ? upcoming.map(renderUpcomingChore)
+        : <Text style={styles.emptyText}>Nothing scheduled for later</Text>
       }
 
       <SectionHeader title="✅  Completed" color={Colors.green} style={{ marginTop: 16 }} />
@@ -103,5 +149,9 @@ const styles = StyleSheet.create({
   strikethrough:  { textDecorationLine: 'line-through', color: Colors.muted },
   choreDue:       { ...Typography.caption, color: Colors.muted, marginTop: 2 },
   choreSource:    { ...Typography.caption, color: Colors.accent, marginTop: 2 },
+  upcomingCard:   {
+    backgroundColor: Colors.surface,
+    borderStyle: 'dashed',
+  },
   emptyText:      { ...Typography.subhead, color: Colors.muted, marginBottom: 12, marginLeft: 4 },
 });

@@ -6,9 +6,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
-import { Card, Avatar, StatusBadge, ProgressRing } from '../components/shared';
+import { Card, Avatar, StatusBadge, ProgressRing, SectionHeader } from '../components/shared';
 import GroupModal from '../components/GroupModal';
 import { useApp } from '../context/AppContext';
+
+// Friendly label for a scheduled-future chore
+function upcomingLabel(offset) {
+  if (offset === 1) return 'Starts next week';
+  return `Starts in ${offset} weeks`;
+}
 
 export default function GroupScreen({ navigation }) {
   const {
@@ -74,13 +80,19 @@ export default function GroupScreen({ navigation }) {
   }
 
   // ── Normal state ─────────────────────────────────────────────────────────
-  const groupChores  = activeGroup ? getChoresForGroup(activeGroup.id) : [];
+  const allGroupChores = activeGroup ? getChoresForGroup(activeGroup.id) : [];
+  const currentChores  = allGroupChores.filter(c => (c.startWeekOffset ?? 0) === 0);
+  const upcomingChores = allGroupChores
+    .filter(c => (c.startWeekOffset ?? 0) > 0)
+    .sort((a, b) => a.startWeekOffset - b.startWeekOffset);
+
   const groupMembers = activeGroup
     ? users.filter(u => activeGroup.memberIds?.includes(u.id))
     : [];
 
-  const completed = groupChores.filter(c => c.status === 'completed').length;
-  const total     = groupChores.length;
+  // Progress counts only this-week chores — upcoming ones aren't actionable yet.
+  const completed = currentChores.filter(c => c.status === 'completed').length;
+  const total     = currentChores.length;
   const progress  = total > 0 ? completed / total : 0;
 
   function handleNudge(chore) {
@@ -127,6 +139,37 @@ export default function GroupScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
           )}
+        </View>
+      </Card>
+    );
+  }
+
+  // Upcoming chore: dimmed look, no nudge button, "Starts in X weeks" badge
+  function renderUpcomingChore(chore) {
+    const user = getUserById(chore.assigneeId);
+    return (
+      <Card key={chore.id} style={[styles.choreCard, styles.upcomingCard]}>
+        <View style={styles.choreRow}>
+          <View style={[styles.dot, { backgroundColor: Colors.muted }]} />
+          <View style={styles.choreInfo}>
+            <Text style={[styles.choreName, { color: Colors.muted }]}>
+              {chore.name}
+            </Text>
+            <View style={styles.choreMetaRow}>
+              <Avatar name={user.name} color={user.color} size={18} />
+              <Text style={styles.choreMeta}>
+                {user.name} · {chore.dueDateStart}–{chore.dueDateEnd}
+              </Text>
+              {chore.autoRotate && (
+                <Text style={styles.rotateTag}>🔄 auto</Text>
+              )}
+            </View>
+          </View>
+          <View style={styles.upcomingBadge}>
+            <Text style={styles.upcomingBadgeText}>
+              {upcomingLabel(chore.startWeekOffset)}
+            </Text>
+          </View>
         </View>
       </Card>
     );
@@ -187,23 +230,38 @@ export default function GroupScreen({ navigation }) {
 
       {/* ── Chores ──────────────────────────────────────────────── */}
       <FlatList
-        data={groupChores}
+        data={currentChores}
         keyExtractor={c => c.id}
         renderItem={renderChore}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyListText}>No chores yet — add one below!</Text>
-          </View>
+          upcomingChores.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyListText}>No chores yet — add one below!</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyListText}>Nothing due this week 🎉</Text>
+            </View>
+          )
         }
         ListFooterComponent={
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => navigation.navigate('AddChore')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.addBtnText}>+ Add Chore</Text>
-          </TouchableOpacity>
+          <>
+            {upcomingChores.length > 0 && (
+              <View style={styles.upcomingSection}>
+                <SectionHeader title="Upcoming" color={Colors.muted} />
+                {upcomingChores.map(renderUpcomingChore)}
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => navigation.navigate('AddChore')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addBtnText}>+ Add Chore</Text>
+            </TouchableOpacity>
+          </>
         }
       />
 
@@ -290,9 +348,31 @@ const styles = StyleSheet.create({
   },
   nudgeBtnSent:  { backgroundColor: Colors.muted + '22' },
   nudgeBtnText:  { fontSize: 11, color: Colors.accent, fontWeight: '600' },
+
+  /* Upcoming section */
+  upcomingSection: {
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  upcomingCard: {
+    borderStyle: 'dashed',
+    backgroundColor: Colors.surface,
+  },
+  upcomingBadge: {
+    backgroundColor: Colors.muted + '22',
+    borderRadius: Radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  upcomingBadgeText: {
+    fontSize: 10,
+    color: Colors.muted,
+    fontWeight: '700',
+  },
+
   addBtn:      {
     borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.accent + '66',
-    borderRadius: Radius.md, padding: 14, alignItems: 'center', marginTop: 4,
+    borderRadius: Radius.md, padding: 14, alignItems: 'center', marginTop: 16,
   },
   addBtnText:  { color: Colors.accent, fontWeight: '600', fontSize: 14 },
   emptyWrap:   { padding: 32, alignItems: 'center' },

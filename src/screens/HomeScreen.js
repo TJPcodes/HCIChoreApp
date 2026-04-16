@@ -19,9 +19,12 @@ export default function HomeScreen({ navigation }) {
 
   const currentUser = getUserById(currentUserId);
 
-  // All chores: every group user is in + personal chores
-  const visibleChores = getAllVisibleChores();
-  const myChores      = visibleChores.filter(c => c.assigneeId === currentUserId);
+  // Only consider chores that are actually in this week's due window.
+  // Anything with startWeekOffset > 0 is scheduled for a future week
+  // and should not appear on Home at all.
+  const allVisibleChores = getAllVisibleChores();
+  const visibleChores    = allVisibleChores.filter(c => (c.startWeekOffset ?? 0) === 0);
+  const myChores         = visibleChores.filter(c => c.assigneeId === currentUserId);
 
   const nextChore    = myChores.find(c => c.status === ChoreStatus.PENDING || c.status === 'pending');
   const overdueCount = visibleChores.filter(c => c.status === ChoreStatus.OVERDUE || c.status === 'overdue').length;
