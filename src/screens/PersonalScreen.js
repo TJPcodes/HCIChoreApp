@@ -1,3 +1,4 @@
+// src/screens/PersonalScreen.js
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -7,14 +8,22 @@ import { Card, SectionHeader, ProgressRing } from '../components/shared';
 import { useApp } from '../context/AppContext';
 
 export default function PersonalScreen() {
-  const { chores, currentUserId, markComplete } = useApp();
+  const { getMyChores, groups, markComplete } = useApp();
 
-  const myChores = chores.filter(c => c.assigneeId === currentUserId);
+  // All chores assigned to me from any group OR personal
+  const myChores = getMyChores();
+
   const dueToday = myChores.filter(c => c.status === 'pending');
   const overdue  = myChores.filter(c => c.status === 'overdue');
   const done     = myChores.filter(c => c.status === 'completed');
   const total    = myChores.length;
   const progress = total > 0 ? done.length / total : 0;
+
+  function groupLabel(chore) {
+    if (chore.groupId === null) return 'Personal';
+    const g = groups.find(gr => gr.id === chore.groupId);
+    return g ? g.name : 'Unknown group';
+  }
 
   function renderChore(chore) {
     const isComplete = chore.status === 'completed';
@@ -28,6 +37,9 @@ export default function PersonalScreen() {
             <Text style={styles.choreDue}>
               {chore.dueDateStart} – {chore.dueDateEnd}
               {chore.autoRotate ? '  🔄 auto-rotate' : ''}
+            </Text>
+            <Text style={styles.choreSource}>
+              {chore.groupId === null ? '👤' : '🏠'} {groupLabel(chore)}
             </Text>
           </View>
           <TouchableOpacity onPress={() => markComplete(chore.id)} activeOpacity={0.7}>
@@ -43,7 +55,6 @@ export default function PersonalScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      {/* Personal chore progress ring. */}
       <View style={styles.progressRow}>
         <ProgressRing progress={progress} size={72} />
         <View style={styles.progressText}>
@@ -52,21 +63,18 @@ export default function PersonalScreen() {
         </View>
       </View>
 
-      {/* Pending chores due today. */}
       <SectionHeader title="☀️  Due / Upcoming" color={Colors.orange} />
       {dueToday.length > 0
         ? dueToday.map(renderChore)
         : <Text style={styles.emptyText}>Nothing pending 🎉</Text>
       }
 
-      {/* Overdue chores. */}
       <SectionHeader title="⚠️  Overdue" color={Colors.red} style={{ marginTop: 16 }} />
       {overdue.length > 0
         ? overdue.map(renderChore)
         : <Text style={styles.emptyText}>Nothing overdue 🎉</Text>
       }
 
-      {/* Completed chores. */}
       <SectionHeader title="✅  Completed" color={Colors.green} style={{ marginTop: 16 }} />
       {done.length > 0
         ? done.map(renderChore)
@@ -94,5 +102,6 @@ const styles = StyleSheet.create({
   choreName:      { ...Typography.subhead, color: Colors.text, fontWeight: '600' },
   strikethrough:  { textDecorationLine: 'line-through', color: Colors.muted },
   choreDue:       { ...Typography.caption, color: Colors.muted, marginTop: 2 },
+  choreSource:    { ...Typography.caption, color: Colors.accent, marginTop: 2 },
   emptyText:      { ...Typography.subhead, color: Colors.muted, marginBottom: 12, marginLeft: 4 },
 });
