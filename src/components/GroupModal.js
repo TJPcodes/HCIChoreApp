@@ -95,14 +95,14 @@ export default function GroupModal({ visible, onClose }) {
           text: 'Leave',
           style: 'destructive',
           onPress: async () => {
-            setBusy(true);
+            setBusyAction(true);
             try {
               await leaveGroup(activeGroup.id);
               closeAndReset();
             } catch (err) {
               Alert.alert('Error', err.message || 'Could not leave group.');
             } finally {
-              setBusy(false);
+              setBusyAction(false);
             }
           },
         },

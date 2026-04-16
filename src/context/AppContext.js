@@ -6,7 +6,20 @@ const AppContext = createContext(null);
 
 // ── Helpers: convert between Supabase snake_case and app camelCase ──────────
 
+// Calculate weeks elapsed since a timestamp (full weeks only)
+function weeksElapsed(timestamp) {
+  const created = new Date(timestamp).getTime();
+  const now = Date.now();
+  const ms = now - created;
+  return Math.floor(ms / (7 * 24 * 60 * 60 * 1000));
+}
+
 function choreFromDb(row) {
+  // Decay startWeekOffset over time: a chore scheduled for 3 weeks out
+  // will show as 2 weeks out after 1 week passes, 1 week after 2 weeks pass, etc.
+  const elapsed = weeksElapsed(row.created_at);
+  const decayedOffset = Math.max(0, (row.start_week_offset ?? 0) - elapsed);
+
   return {
     id:              row.id,
     name:            row.name,
@@ -17,7 +30,7 @@ function choreFromDb(row) {
     dueDateStart:    row.due_date_start,
     dueDateEnd:      row.due_date_end,
     status:          row.status,
-    startWeekOffset: row.start_week_offset ?? 0,
+    startWeekOffset: decayedOffset,
   };
 }
 

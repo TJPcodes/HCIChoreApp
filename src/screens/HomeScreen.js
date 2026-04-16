@@ -9,7 +9,9 @@ import { Card, SectionHeader } from '../components/shared';
 import { useApp } from '../context/AppContext';
 import { ChoreStatus } from '../models/data';
 
-const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const WEEK_DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+// JS getDay(): 0=Sun, 1=Mon, … 6=Sat — matches Sun-first order directly
+const todayIndex = new Date().getDay();
 
 export default function HomeScreen({ navigation }) {
   const {
@@ -31,15 +33,20 @@ export default function HomeScreen({ navigation }) {
   const dueSoonCount = visibleChores.filter(c => c.status === ChoreStatus.PENDING || c.status === 'pending').length;
 
   // Build weekly strip from my chores (all groups + personal)
-  const dayMap = { 'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6 };
-  const choreDays = Array(7).fill(null);
-  const doneDays  = Array(7).fill(false);
+  const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  // Each slot: { total, done, firstName }
+  const dayCounts = Array.from({ length: 7 }, () => ({ total: 0, done: 0, firstName: null }));
 
   myChores.forEach(c => {
     const idx = dayMap[c.dueDateStart];
     if (idx !== undefined) {
-      choreDays[idx] = c.name.length > 5 ? c.name.slice(0, 4) : c.name;
-      doneDays[idx]  = c.status === ChoreStatus.COMPLETED || c.status === 'completed';
+      dayCounts[idx].total += 1;
+      if (c.status === ChoreStatus.COMPLETED || c.status === 'completed') {
+        dayCounts[idx].done += 1;
+      }
+      if (!dayCounts[idx].firstName) {
+        dayCounts[idx].firstName = c.name.length > 5 ? c.name.slice(0, 4) : c.name;
+      }
     }
   });
 
@@ -78,24 +85,41 @@ export default function HomeScreen({ navigation }) {
       {/* Weekly Strip */}
       <SectionHeader title="This Week" />
       <View style={styles.weekRow}>
-        {WEEK_DAYS.map((day, i) => (
-          <View key={i} style={styles.dayCol}>
-            <Text style={styles.dayLabel}>{day}</Text>
-            <View style={[
-              styles.dayCell,
-              doneDays[i]    && styles.dayCellDone,
-              choreDays[i] && !doneDays[i] && styles.dayCellPending,
-            ]}>
-              <Text style={[
-                styles.dayCellText,
-                doneDays[i] && { color: Colors.green },
-                choreDays[i] && !doneDays[i] && { color: Colors.accent },
+        {WEEK_DAYS.map((day, i) => {
+          const { total, done, firstName } = dayCounts[i];
+          const allDone    = total > 0 && done === total;
+          const hasPending = total > 0 && !allDone;
+          const extra      = total > 1 ? total - 1 : 0;
+
+          let label = '';
+          if (allDone) {
+            label = '✓';
+          } else if (total > 0) {
+            label = firstName || '';
+          }
+
+          return (
+            <View key={i} style={styles.dayCol}>
+              <Text style={[styles.dayLabel, i === todayIndex && { color: Colors.red }]}>{day}</Text>
+              <View style={[
+                styles.dayCell,
+                allDone    && styles.dayCellDone,
+                hasPending && styles.dayCellPending,
               ]}>
-                {doneDays[i] ? '✓' : choreDays[i] || ''}
-              </Text>
+                <Text style={[
+                  styles.dayCellText,
+                  allDone    && { color: Colors.green },
+                  hasPending && { color: Colors.accent },
+                ]}>
+                  {label}
+                </Text>
+                {extra > 0 && (
+                  <Text style={[styles.dayCellExtra, allDone && { color: Colors.green }]}>+{extra}</Text>
+                )}
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       {/* Next Due */}
@@ -180,13 +204,14 @@ const styles = StyleSheet.create({
   dayCol:       { flex: 1, alignItems: 'center', gap: 4 },
   dayLabel:     { ...Typography.micro, color: Colors.muted },
   dayCell:      {
-    width: '100%', height: 40, borderRadius: Radius.sm,
+    width: '100%', height: 44, borderRadius: Radius.sm,
     backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center', paddingVertical: 2,
   },
   dayCellDone:    { backgroundColor: Colors.green + '22', borderColor: Colors.green },
   dayCellPending: { backgroundColor: Colors.accent + '22', borderColor: Colors.accent },
-  dayCellText:    { fontSize: 9, fontWeight: '700', color: 'transparent' },
+  dayCellText:    { fontSize: 9, fontWeight: '700', color: Colors.muted },
+  dayCellExtra:   { fontSize: 8, fontWeight: '800', color: Colors.accent, marginTop: 1 },
 
   /* Up next */
   nextChoreRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
