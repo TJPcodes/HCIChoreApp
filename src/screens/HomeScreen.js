@@ -162,25 +162,6 @@ const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.bg },
   content:      { padding: 20, paddingBottom: 40 },
 
-  /* Dev banner */
-  devBanner:    {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: Colors.orange + '14', borderWidth: 1, borderColor: Colors.orange + '44',
-    borderRadius: Radius.sm, padding: 10, marginBottom: 16,
-  },
-  devLabelRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  devLabel:     { ...Typography.micro, color: Colors.orange },
-  devBtnLoad:   {
-    backgroundColor: Colors.accent, borderRadius: Radius.sm,
-    paddingHorizontal: 12, paddingVertical: 6,
-  },
-  devBtnLoadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  devBtnClear:  {
-    backgroundColor: Colors.red + '22', borderWidth: 1, borderColor: Colors.red + '55',
-    borderRadius: Radius.sm, paddingHorizontal: 12, paddingVertical: 6,
-  },
-  devBtnClearText: { color: Colors.red, fontSize: 11, fontWeight: '700' },
-
   /* Greeting */
   greeting:     { marginBottom: 16 },
   greetingSub:  { ...Typography.subhead, color: Colors.muted },

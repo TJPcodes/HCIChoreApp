@@ -93,6 +93,8 @@ export function AppProvider({ children }) {
   // `forcedActiveGroupId` bypasses the stale-closure issue after createGroup/joinGroup.
 
   async function fetchData(userId, forcedActiveGroupId) {
+    // Show spinner while we fetch — prevents "Unknown" flash on login
+    setLoaded(false);
     try {
       const { data: myProfile } = await supabase
         .from('profiles')

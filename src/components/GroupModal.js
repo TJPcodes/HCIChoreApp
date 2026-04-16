@@ -18,20 +18,20 @@ import { useApp } from '../context/AppContext';
  */
 export default function GroupModal({ visible, onClose }) {
   const {
-    activeGroupId, groups, switchGroup,
+    activeGroupId, groups,
     createGroup, joinGroup, leaveGroup,
   } = useApp();
 
   const [newGroupName, setNewGroupName] = useState('');
   const [joinCode,     setJoinCode]     = useState('');
-  const [busy,         setBusy]         = useState(false);
+  const [busyAction,   setBusyAction]   = useState(null); // 'create' | 'join' | null
 
   const activeGroup = groups.find(g => g.id === activeGroupId);
 
   function closeAndReset() {
     setNewGroupName('');
     setJoinCode('');
-    setBusy(false);
+    setBusyAction(null);
     onClose();
   }
 
@@ -51,7 +51,7 @@ export default function GroupModal({ visible, onClose }) {
       Alert.alert('Missing name', 'Please enter a group name.');
       return;
     }
-    setBusy(true);
+    setBusyAction('create');
     try {
       await createGroup(newGroupName.trim());
       Alert.alert('Group created! 🎉', `"${newGroupName.trim()}" is now your active group.`);
@@ -59,7 +59,7 @@ export default function GroupModal({ visible, onClose }) {
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not create group. Please try again.');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -68,7 +68,7 @@ export default function GroupModal({ visible, onClose }) {
       Alert.alert('Missing code', 'Please enter an invite code.');
       return;
     }
-    setBusy(true);
+    setBusyAction('join');
     try {
       const { group, alreadyMember } = await joinGroup(joinCode);
       if (alreadyMember) {
@@ -80,13 +80,8 @@ export default function GroupModal({ visible, onClose }) {
     } catch (err) {
       Alert.alert('Error', err.message || 'Could not join group. Please try again.');
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
-  }
-
-  function handleSwitch(groupId) {
-    switchGroup(groupId);
-    closeAndReset();
   }
 
   function handleLeave() {
@@ -114,8 +109,6 @@ export default function GroupModal({ visible, onClose }) {
       ],
     );
   }
-
-  const otherGroups = groups.filter(g => g.id !== activeGroupId);
 
   return (
     <Modal
@@ -154,7 +147,7 @@ export default function GroupModal({ visible, onClose }) {
                 <TouchableOpacity
                   style={styles.leaveBtn}
                   onPress={handleLeave}
-                  disabled={busy}
+                  disabled={!!busyAction}
                   activeOpacity={0.7}
                 >
                   <Ionicons name="exit-outline" size={16} color={Colors.red} />
@@ -162,28 +155,6 @@ export default function GroupModal({ visible, onClose }) {
                 </TouchableOpacity>
               </View>
             )}
-
-            {/* ── Switch to another group ────────────────────────────── */}
-            {/* {otherGroups.length > 0 && (
-              <>
-                <View style={styles.divider} />
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Switch Group</Text>
-                  {otherGroups.map(g => (
-                    <TouchableOpacity
-                      key={g.id}
-                      style={styles.groupRow}
-                      onPress={() => handleSwitch(g.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="home-outline" size={18} color={Colors.accent} />
-                      <Text style={styles.groupRowText}>{g.name}</Text>
-                      <Ionicons name="chevron-forward" size={16} color={Colors.muted} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )} */}
 
             <View style={styles.divider} />
 
@@ -197,15 +168,15 @@ export default function GroupModal({ visible, onClose }) {
                 value={newGroupName}
                 onChangeText={setNewGroupName}
                 autoCapitalize="words"
-                editable={!busy}
+                editable={!busyAction}
               />
               <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: Colors.accent }, busy && styles.disabled]}
+                style={[styles.actionBtn, { backgroundColor: Colors.accent }, !!busyAction && styles.disabled]}
                 onPress={handleCreate}
-                disabled={busy}
+                disabled={!!busyAction}
                 activeOpacity={0.8}
               >
-                {busy
+                {busyAction === 'create'
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={styles.actionBtnText}>+ Create Group</Text>}
               </TouchableOpacity>
@@ -225,15 +196,15 @@ export default function GroupModal({ visible, onClose }) {
                 onChangeText={setJoinCode}
                 autoCapitalize="characters"
                 autoCorrect={false}
-                editable={!busy}
+                editable={!busyAction}
               />
               <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: Colors.teal }, busy && styles.disabled]}
+                style={[styles.actionBtn, { backgroundColor: Colors.teal }, !!busyAction && styles.disabled]}
                 onPress={handleJoin}
-                disabled={busy}
+                disabled={!!busyAction}
                 activeOpacity={0.8}
               >
-                {busy
+                {busyAction === 'join'
                   ? <ActivityIndicator color="#fff" size="small" />
                   : <Text style={styles.actionBtnText}>Join Group</Text>}
               </TouchableOpacity>
