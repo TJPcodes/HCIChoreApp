@@ -1,3 +1,4 @@
+// src/screens/HomeScreen.js
 import React from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
@@ -5,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
-import { Card, SectionHeader, GhostButton } from '../components/shared';
+import { Card, SectionHeader } from '../components/shared';
 import { useApp } from '../context/AppContext';
 import { ChoreStatus } from '../models/data';
 
@@ -13,17 +14,22 @@ const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 export default function HomeScreen({ navigation }) {
   const {
-    chores, currentUserId, getUserById, markComplete,
+    currentUserId, getUserById, markComplete,
+    getVisibleChores, activeGroupId, groups,
     isDemoLoaded, loadDemoData, clearAll,
   } = useApp();
 
   const currentUser = getUserById(currentUserId);
-  const myChores    = chores.filter(c => c.assigneeId === currentUserId);
-  const nextChore   = myChores.find(c => c.status === ChoreStatus.PENDING || c.status === 'pending');
-  const overdueCount = chores.filter(c => c.status === ChoreStatus.OVERDUE || c.status === 'overdue').length;
-  const dueSoonCount = chores.filter(c => c.status === ChoreStatus.PENDING || c.status === 'pending').length;
 
-  // Build weekly strip from real chore data
+  // Active group chores + personal chores
+  const visibleChores = getVisibleChores();
+  const myChores      = visibleChores.filter(c => c.assigneeId === currentUserId);
+
+  const nextChore    = myChores.find(c => c.status === ChoreStatus.PENDING || c.status === 'pending');
+  const overdueCount = visibleChores.filter(c => c.status === ChoreStatus.OVERDUE || c.status === 'overdue').length;
+  const dueSoonCount = visibleChores.filter(c => c.status === ChoreStatus.PENDING || c.status === 'pending').length;
+
+  // Build weekly strip from MY chores only
   const dayMap = { 'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6 };
   const choreDays = Array(7).fill(null);
   const doneDays  = Array(7).fill(false);
@@ -35,6 +41,9 @@ export default function HomeScreen({ navigation }) {
       doneDays[idx]  = c.status === ChoreStatus.COMPLETED || c.status === 'completed';
     }
   });
+
+  const activeGroup = groups.find(g => g.id === activeGroupId);
+  const inGroup     = !!activeGroup;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -60,6 +69,9 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.greeting}>
         <Text style={styles.greetingSub}>Welcome back,</Text>
         <Text style={styles.greetingName}>{currentUser.name} 👋</Text>
+        {inGroup && (
+          <Text style={styles.groupLabel}>🏠 {activeGroup.name}</Text>
+        )}
       </View>
 
       {/* Status Banner */}
@@ -101,16 +113,31 @@ export default function HomeScreen({ navigation }) {
           <SectionHeader title="Up Next" style={{ marginTop: 16 }} />
           <Card>
             <View style={styles.nextChoreRow}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.nextChoreName}>{nextChore.name}</Text>
                 <Text style={styles.nextChoreDate}>
                   {nextChore.dueDateStart} – {nextChore.dueDateEnd}
+                  {nextChore.groupId === null && '  ·  Personal'}
                 </Text>
               </View>
               <TouchableOpacity style={styles.doneBtn} onPress={() => markComplete(nextChore.id)} activeOpacity={0.8}>
                 <Text style={styles.doneBtnText}>Mark Done ✓</Text>
               </TouchableOpacity>
             </View>
+          </Card>
+        </>
+      )}
+
+      {/* No chores state */}
+      {!nextChore && visibleChores.length === 0 && (
+        <>
+          <SectionHeader title="No chores yet" style={{ marginTop: 16 }} />
+          <Card>
+            <Text style={styles.noChoresText}>
+              {inGroup
+                ? 'Add a chore to get started.'
+                : "You're not in a group yet. Add a personal chore, or join a group from the Group tab."}
+            </Text>
           </Card>
         </>
       )}
@@ -163,10 +190,13 @@ const styles = StyleSheet.create({
   },
   devBtnClearText: { color: Colors.red, fontSize: 11, fontWeight: '700' },
 
-  /* Rest of styles */
+  /* Greeting */
   greeting:     { marginBottom: 16 },
   greetingSub:  { ...Typography.subhead, color: Colors.muted },
   greetingName: { ...Typography.largeTitle, color: Colors.text },
+  groupLabel:   { ...Typography.subhead, color: Colors.muted, marginTop: 4 },
+
+  /* Status & week */
   statusBanner: { marginBottom: 20 },
   statusRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statusText:   { ...Typography.subhead, color: Colors.text },
@@ -182,11 +212,18 @@ const styles = StyleSheet.create({
   dayCellDone:    { backgroundColor: Colors.green + '22', borderColor: Colors.green },
   dayCellPending: { backgroundColor: Colors.accent + '22', borderColor: Colors.accent },
   dayCellText:    { fontSize: 9, fontWeight: '700', color: 'transparent' },
+
+  /* Up next */
   nextChoreRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nextChoreName:  { ...Typography.headline, color: Colors.text },
   nextChoreDate:  { ...Typography.caption, color: Colors.muted, marginTop: 2 },
   doneBtn:        { backgroundColor: Colors.green, borderRadius: Radius.sm, paddingHorizontal: 14, paddingVertical: 8 },
   doneBtnText:    { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  /* No chores */
+  noChoresText:   { ...Typography.body, color: Colors.muted, textAlign: 'center' },
+
+  /* Quick actions */
   actionsGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   actionBtn:      {
     width: '47%', borderRadius: Radius.md, borderWidth: 1,

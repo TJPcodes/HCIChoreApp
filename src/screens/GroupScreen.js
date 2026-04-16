@@ -1,34 +1,83 @@
-import React, { useLayoutEffect, useState } from 'react';
+// src/screens/GroupScreen.js
+import React, { useState, useLayoutEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
 import { Card, Avatar, StatusBadge, ProgressRing } from '../components/shared';
+import GroupModal from '../components/GroupModal';
 import { useApp } from '../context/AppContext';
 
 export default function GroupScreen({ navigation }) {
   const {
     chores, users, activeGroupId, groups,
-    getUserById, getChoresForGroup, sendNudge,
+    getUserById, getChoresForGroup, markComplete, sendNudge,
   } = useApp();
 
-  const [nudged, setNudged] = useState({});
+  const [nudged, setNudged]           = useState({});
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const activeGroup  = groups.find(g => g.id === activeGroupId);
-  const groupChores  = activeGroupId ? getChoresForGroup(activeGroupId) : chores;
+  const activeGroup = groups.find(g => g.id === activeGroupId);
+  const hasGroups   = groups.length > 0;
+
+  // ── Header: invite button (only when in a group) ─────────────────────────
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: hasGroups
+        ? () => (
+            <TouchableOpacity
+              onPress={() => setModalVisible(true)}
+              style={styles.headerBtn}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="person-add-outline" size={22} color={Colors.accent} />
+            </TouchableOpacity>
+          )
+        : undefined,
+    });
+  }, [navigation, hasGroups]);
+
+  // ── Empty state: no groups ───────────────────────────────────────────────
+  if (!hasGroups) {
+    return (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyContent}>
+          <Text style={styles.emptyIcon}>🏠</Text>
+          <Text style={styles.emptyTitle}>You're not in a group yet</Text>
+          <Text style={styles.emptyText}>
+            Create a group for your household, or join one with an invite code from a friend.
+          </Text>
+
+          <TouchableOpacity
+            style={styles.emptyBtnPrimary}
+            onPress={() => setModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add-circle-outline" size={20} color="#fff" />
+            <Text style={styles.emptyBtnPrimaryText}>Create or Join a Group</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.emptyHint}>
+            You can still add personal chores without a group — head to the Home tab.
+          </Text>
+        </View>
+
+        <GroupModal visible={modalVisible} onClose={() => setModalVisible(false)} />
+      </View>
+    );
+  }
+
+  // ── Normal state: in a group ─────────────────────────────────────────────
+  const groupChores  = getChoresForGroup(activeGroupId);
   const groupMembers = activeGroup
     ? users.filter(u => activeGroup.memberIds.includes(u.id))
-    : users;
+    : [];
 
   const completed = groupChores.filter(c => c.status === 'completed').length;
   const total     = groupChores.length;
   const progress  = total > 0 ? completed / total : 0;
-  const groupName = activeGroup ? activeGroup.name : 'Group';
-
-  useLayoutEffect(() => {
-    navigation.setOptions({ title: groupName });
-  }, [navigation, groupName]);
 
   function handleNudge(chore) {
     setNudged(prev => ({ ...prev, [chore.id]: true }));
@@ -42,14 +91,12 @@ export default function GroupScreen({ navigation }) {
     return (
       <Card overdue={isOver} style={styles.choreCard}>
         <View style={styles.choreRow}>
-          {/* Chore status dot. */}
           <View style={[styles.dot, {
             backgroundColor:
               chore.status === 'completed' ? Colors.green :
               chore.status === 'overdue'   ? Colors.red   : Colors.orange,
           }]} />
 
-          {/* Info about the chore. */}
           <View style={styles.choreInfo}>
             <Text style={styles.choreName}>{chore.name}</Text>
             <View style={styles.choreMetaRow}>
@@ -63,7 +110,6 @@ export default function GroupScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Right side. */}
           {chore.status === 'completed' ? (
             <StatusBadge status="completed" />
           ) : (
@@ -84,16 +130,14 @@ export default function GroupScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Group header. */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.groupName}>🏠 {groupName}</Text>
+          <Text style={styles.groupName}>🏠 {activeGroup.name}</Text>
           <Text style={styles.headerSub}>{completed}/{total} tasks completed this week</Text>
         </View>
         <ProgressRing progress={progress} size={52} />
       </View>
 
-      {/* Avatars for members. */}
       <View style={styles.membersRow}>
         {groupMembers.map(m => (
           <View key={m.id} style={styles.memberItem}>
@@ -103,7 +147,6 @@ export default function GroupScreen({ navigation }) {
         ))}
       </View>
 
-      {/* List of chores. */}
       <FlatList
         data={groupChores}
         keyExtractor={c => c.id}
@@ -111,37 +154,54 @@ export default function GroupScreen({ navigation }) {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>No chores yet — add one below!</Text>
+            <Text style={styles.emptyListText}>No chores yet — add one below!</Text>
           </View>
         }
         ListFooterComponent={
-          <>
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => navigation.navigate('AddChore')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.addBtnText}>+ Add Chore</Text>
-            </TouchableOpacity>
-
-            <View style={styles.footerGap} />
-
-            <TouchableOpacity
-              style={styles.switchGroupBtn}
-              onPress={() => navigation.navigate('SwitchGroup')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.switchGroupBtnText}>🔄 Switch Group</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => navigation.navigate('AddChore')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.addBtnText}>+ Add Chore</Text>
+          </TouchableOpacity>
         }
       />
+
+      <GroupModal visible={modalVisible} onClose={() => setModalVisible(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: Colors.bg },
+  headerBtn:   { marginLeft: 12, padding: 4 },
+
+  /* Empty state */
+  emptyContainer: { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center' },
+  emptyContent:   { padding: 32, alignItems: 'center' },
+  emptyIcon:      { fontSize: 56, marginBottom: 16 },
+  emptyTitle:     { ...Typography.title, color: Colors.text, textAlign: 'center', marginBottom: 8 },
+  emptyText:      { ...Typography.body, color: Colors.muted, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  emptyBtnPrimary: {
+    flexDirection: 'row',
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyBtnPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  emptyHint: {
+    ...Typography.caption,
+    color: Colors.muted,
+    textAlign: 'center',
+    marginTop: 24,
+    lineHeight: 18,
+  },
+
+  /* Normal state */
   header:      {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: Colors.surface, padding: 16,
@@ -175,13 +235,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md, padding: 14, alignItems: 'center', marginTop: 4,
   },
   addBtnText:  { color: Colors.accent, fontWeight: '600', fontSize: 14 },
-  footerGap:   { height: 46 },
-  switchGroupBtn: {
-    borderWidth: 1, borderColor: Colors.text + '66',
-    borderRadius: Radius.md, padding: 14, alignItems: 'center',
-    backgroundColor: Colors.card,
-  },
-  switchGroupBtnText: { color: Colors.text, fontWeight: '600', fontSize: 14 },
   emptyWrap:   { padding: 32, alignItems: 'center' },
-  emptyText:   { ...Typography.body, color: Colors.muted, textAlign: 'center' },
+  emptyListText: { ...Typography.body, color: Colors.muted, textAlign: 'center' },
 });
