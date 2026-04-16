@@ -17,6 +17,7 @@ function choreFromDb(row) {
     dueDateStart: row.due_date_start,
     dueDateEnd:   row.due_date_end,
     status:       row.status,
+    startWeekOffset: row.start_week_offset,
   };
 }
 
@@ -368,6 +369,7 @@ export function AppProvider({ children }) {
         due_date_end:   chore.dueDateEnd || 'Wed',
         status:         'pending',
         created_by:     state.currentUserId,
+        start_week_offset: chore.startWeekOffset ?? 0,
       })
       .select()
       .single();

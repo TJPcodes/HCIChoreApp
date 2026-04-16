@@ -6,11 +6,18 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
-import { PrimaryButton } from '../components/shared';
+import { PrimaryButton, Avatar } from '../components/shared';
 import { useApp } from '../context/AppContext';
 import { ChoreFrequency } from '../models/data';
 
 const FREQUENCIES = Object.values(ChoreFrequency);
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const START_OPTIONS = [
+  { value: 0, label: 'This Week' },
+  { value: 1, label: 'Next Week' },
+  { value: 2, label: 'In 2 Weeks' },
+  { value: 3, label: 'In 3 Weeks' },
+];
 
 export default function AddChoreScreen({ navigation }) {
   const { users, currentUserId, activeGroupId, groups, addChore } = useApp();
@@ -24,26 +31,42 @@ export default function AddChoreScreen({ navigation }) {
   // Default to active group if one is set, else personal
   const defaultScope = activeGroupId || 'personal';
 
-  const [scope,        setScope]        = useState(defaultScope);
-  const [scopeOpen,    setScopeOpen]    = useState(false);
-  const [name,         setName]         = useState('');
-  const [frequency,    setFrequency]    = useState(ChoreFrequency.WEEKLY);
-  const [autoRotate,   setAutoRotate]   = useState(true);
-  const [selectedUser, setSelectedUser] = useState(currentUserId);
-  const [reminderOn,   setReminderOn]   = useState(true);
-  const [dueDateStart, setDueDateStart] = useState('Mon');
-  const [dueDateEnd,   setDueDateEnd]   = useState('Wed');
-  const [saving,       setSaving]       = useState(false);
+  const [scope,           setScope]           = useState(defaultScope);
+  const [scopeOpen,       setScopeOpen]       = useState(false);
+  const [name,            setName]            = useState('');
+  const [frequency,       setFrequency]       = useState(ChoreFrequency.WEEKLY);
+  const [autoRotate,      setAutoRotate]      = useState(true);
+  const [selectedUser,    setSelectedUser]    = useState(currentUserId);
+  const [reminderOn,      setReminderOn]      = useState(true);
+  const [dueDateStart,    setDueDateStart]    = useState('Mon');
+  const [dueDateEnd,      setDueDateEnd]      = useState('Wed');
+  const [startWeekOffset, setStartWeekOffset] = useState(0);
+  const [saving,          setSaving]          = useState(false);
 
   // Current scope info
   const currentScope = scopeOptions.find(o => o.value === scope) || scopeOptions[0];
   const isPersonal   = currentScope.groupId === null;
   const targetGroup  = isPersonal ? null : groups.find(g => g.id === currentScope.groupId);
 
-  // Members for the selected group (for manual assignment)
+  // Members for the selected group (for assignment)
   const groupMembers = targetGroup
     ? users.filter(u => targetGroup.memberIds?.includes(u.id))
     : [];
+
+  // If the chosen start day gets pushed past the end day, drag the end along
+  function handleStartDay(day) {
+    setDueDateStart(day);
+    if (DAYS.indexOf(day) > DAYS.indexOf(dueDateEnd)) {
+      setDueDateEnd(day);
+    }
+  }
+
+  // End day can't be earlier than start day
+  function handleEndDay(day) {
+    if (DAYS.indexOf(day) >= DAYS.indexOf(dueDateStart)) {
+      setDueDateEnd(day);
+    }
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -54,15 +77,16 @@ export default function AddChoreScreen({ navigation }) {
     setSaving(true);
     try {
       await addChore({
-        name:         name.trim(),
+        name:            name.trim(),
         frequency,
-        autoRotate:   isPersonal ? false : autoRotate,
-        assigneeId:   isPersonal
-                        ? currentUserId
-                        : (autoRotate ? currentUserId : selectedUser),
-        groupId:      currentScope.groupId,
+        autoRotate:      isPersonal ? false : autoRotate,
+        // Always honor the picked assignee — auto-rotate just controls what happens
+        // on the NEXT cycle, not the initial assignment.
+        assigneeId:      isPersonal ? currentUserId : selectedUser,
+        groupId:         currentScope.groupId,
         dueDateStart,
         dueDateEnd,
+        startWeekOffset,
       });
 
       Alert.alert('Chore saved!', `"${name}" was added.`, [
@@ -116,38 +140,119 @@ export default function AddChoreScreen({ navigation }) {
         ))}
       </View>
 
-      {/* Due Window */}
+      {/* ── Starts (week offset) ───────────────────────────────── */}
+      <Text style={styles.label}>Starts</Text>
+      <View style={styles.chipRow}>
+        {START_OPTIONS.map(opt => {
+          const active = startWeekOffset === opt.value;
+          return (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => setStartWeekOffset(opt.value)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* ── Due Window — day pickers ───────────────────────────── */}
       <Text style={styles.label}>Due Window</Text>
-      <View style={styles.row}>
-        <View style={styles.halfInput}>
-          <Text style={styles.inputLabel}>Starts</Text>
-          <TextInput
-            style={styles.input}
-            value={dueDateStart}
-            onChangeText={setDueDateStart}
-            placeholder="Mon"
-            placeholderTextColor={Colors.muted}
-          />
-        </View>
-        <View style={styles.halfInput}>
-          <Text style={styles.inputLabel}>Ends</Text>
-          <TextInput
-            style={styles.input}
-            value={dueDateEnd}
-            onChangeText={setDueDateEnd}
-            placeholder="Wed"
-            placeholderTextColor={Colors.muted}
-          />
-        </View>
+
+      <Text style={styles.inputLabel}>Starts on</Text>
+      <View style={styles.dayRow}>
+        {DAYS.map(d => {
+          const active = dueDateStart === d;
+          return (
+            <TouchableOpacity
+              key={d}
+              style={[styles.dayChip, active && styles.dayChipActive]}
+              onPress={() => handleStartDay(d)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dayChipText, active && styles.dayChipTextActive]}>
+                {d}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.inputLabel, { marginTop: 10 }]}>Ends on</Text>
+      <View style={styles.dayRow}>
+        {DAYS.map(d => {
+          const active   = dueDateEnd === d;
+          const disabled = DAYS.indexOf(d) < DAYS.indexOf(dueDateStart);
+          return (
+            <TouchableOpacity
+              key={d}
+              disabled={disabled}
+              style={[
+                styles.dayChip,
+                active && styles.dayChipActive,
+                disabled && styles.dayChipDisabled,
+              ]}
+              onPress={() => handleEndDay(d)}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.dayChipText,
+                active && styles.dayChipTextActive,
+                disabled && styles.dayChipTextDisabled,
+              ]}>
+                {d}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
       <Text style={styles.hint}>The chore can be done any time in this window.</Text>
 
-      {/* Assignment (only for group chores) */}
-      {!isPersonal && (
+      {/* ── Assignment (only for group chores) ─────────────────── */}
+      {!isPersonal && groupMembers.length > 0 && (
         <>
           <Text style={styles.label}>Assignment</Text>
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Auto-rotate between members</Text>
+
+          <Text style={styles.inputLabel}>Initially assigned to</Text>
+          <View style={styles.chipRow}>
+            {groupMembers.map(u => {
+              const selected = selectedUser === u.id;
+              return (
+                <TouchableOpacity
+                  key={u.id}
+                  style={[
+                    styles.userChip,
+                    selected && {
+                      borderColor: u.color,
+                      backgroundColor: u.color + '22',
+                    },
+                  ]}
+                  onPress={() => setSelectedUser(u.id)}
+                  activeOpacity={0.7}
+                >
+                  <Avatar name={u.name} color={u.color} size={22} />
+                  <Text style={[
+                    styles.userChipText,
+                    selected && { color: u.color },
+                  ]}>
+                    {u.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={[styles.toggleRow, { marginTop: 12 }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleLabel}>Auto-rotate between members</Text>
+              <Text style={styles.toggleHint}>
+                After each completion, passes to the next member.
+              </Text>
+            </View>
             <Switch
               value={autoRotate}
               onValueChange={setAutoRotate}
@@ -155,33 +260,6 @@ export default function AddChoreScreen({ navigation }) {
               thumbColor="#fff"
             />
           </View>
-
-          {!autoRotate && groupMembers.length > 0 && (
-            <>
-              <Text style={[styles.inputLabel, { marginTop: 12 }]}>Assign to</Text>
-              <View style={styles.chipRow}>
-                {groupMembers.map(u => (
-                  <TouchableOpacity
-                    key={u.id}
-                    style={[
-                      styles.chip,
-                      selectedUser === u.id && {
-                        ...styles.chipActive,
-                        borderColor: u.color,
-                        backgroundColor: u.color + '22',
-                      },
-                    ]}
-                    onPress={() => setSelectedUser(u.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.chipText, selectedUser === u.id && { color: u.color }]}>
-                      {u.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </>
-          )}
         </>
       )}
 
@@ -249,7 +327,7 @@ const styles = StyleSheet.create({
   container:     { flex: 1, backgroundColor: Colors.bg },
   content:       { padding: 20, paddingBottom: 60 },
   label:         { ...Typography.headline, color: Colors.text, marginTop: 20, marginBottom: 8 },
-  inputLabel:    { ...Typography.caption, color: Colors.muted, marginBottom: 4 },
+  inputLabel:    { ...Typography.caption, color: Colors.muted, marginBottom: 6 },
   input:         {
     backgroundColor: Colors.card, borderRadius: Radius.md,
     borderWidth: 1, borderColor: Colors.border,
@@ -320,24 +398,75 @@ const styles = StyleSheet.create({
     color: Colors.accent,
   },
 
-  chipRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:          {
+  /* Generic chips */
+  chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:           {
     borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border,
     backgroundColor: Colors.card, paddingHorizontal: 12, paddingVertical: 7,
   },
-  chipActive:    { borderColor: Colors.accent, backgroundColor: Colors.accent + '22' },
-  chipText:      { color: Colors.muted, fontSize: 13, fontWeight: '600' },
-  chipTextActive:{ color: Colors.accent },
-  row:           { flexDirection: 'row', gap: 12 },
-  halfInput:     { flex: 1 },
-  hint:          { ...Typography.caption, color: Colors.muted, marginTop: 6 },
-  toggleRow:     {
+  chipActive:     { borderColor: Colors.accent, backgroundColor: Colors.accent + '22' },
+  chipText:       { color: Colors.muted, fontSize: 13, fontWeight: '600' },
+  chipTextActive: { color: Colors.accent },
+
+  /* Day chips — 7-across, equal width */
+  dayRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  dayChip: {
+    flex: 1,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  dayChipActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + '22',
+  },
+  dayChipDisabled: {
+    opacity: 0.35,
+  },
+  dayChipText: {
+    color: Colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dayChipTextActive:   { color: Colors.accent },
+  dayChipTextDisabled: { color: Colors.muted },
+
+  /* User chips (with avatar) */
+  userChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  userChipText: {
+    color: Colors.muted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  hint: { ...Typography.caption, color: Colors.muted, marginTop: 6 },
+
+  toggleRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: Colors.card, borderRadius: Radius.md, padding: 14,
     borderWidth: 1, borderColor: Colors.border,
+    gap: 10,
   },
-  toggleLabel:   { ...Typography.subhead, color: Colors.text, flex: 1 },
-  saveBtn:       { marginTop: 32 },
-  cancelBtn:     { marginTop: 12, alignItems: 'center', padding: 12 },
-  cancelText:    { color: Colors.muted, fontSize: 14 },
+  toggleLabel: { ...Typography.subhead, color: Colors.text },
+  toggleHint:  { ...Typography.caption, color: Colors.muted, marginTop: 2 },
+
+  saveBtn:    { marginTop: 32 },
+  cancelBtn:  { marginTop: 12, alignItems: 'center', padding: 12 },
+  cancelText: { color: Colors.muted, fontSize: 14 },
 });
