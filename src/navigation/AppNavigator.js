@@ -109,10 +109,10 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Activity" component={ActivityStack} />
       <Tab.Screen name="Home"     component={HomeStack}     />
       <Tab.Screen name="Group"    component={GroupStack}    />
       <Tab.Screen name="Personal" component={PersonalStack} />
+      <Tab.Screen name="Activity" component={ActivityStack} />
     </Tab.Navigator>
   );
 }

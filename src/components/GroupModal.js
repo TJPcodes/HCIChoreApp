@@ -164,7 +164,7 @@ export default function GroupModal({ visible, onClose }) {
             )}
 
             {/* ── Switch to another group ────────────────────────────── */}
-            {otherGroups.length > 0 && (
+            {/* {otherGroups.length > 0 && (
               <>
                 <View style={styles.divider} />
                 <View style={styles.section}>
@@ -183,7 +183,7 @@ export default function GroupModal({ visible, onClose }) {
                   ))}
                 </View>
               </>
-            )}
+            )} */}
 
             <View style={styles.divider} />
 

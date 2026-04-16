@@ -15,7 +15,6 @@ export default function HomeScreen({ navigation }) {
   const {
     currentUserId, getUserById, markComplete,
     getAllVisibleChores, groups,
-    isDemoLoaded, loadDemoData, clearAll,
   } = useApp();
 
   const currentUser = getUserById(currentUserId);
@@ -49,23 +48,6 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-
-      {/* ── Dev Mode Banner ──────────────────────────────────────────── */}
-      <View style={styles.devBanner}>
-        <View style={styles.devLabelRow}>
-          <Ionicons name="construct" size={14} color={Colors.orange} />
-          <Text style={styles.devLabel}>DEV MODE</Text>
-        </View>
-        {isDemoLoaded ? (
-          <TouchableOpacity style={styles.devBtnClear} onPress={clearAll} activeOpacity={0.7}>
-            <Text style={styles.devBtnClearText}>Clear Demo Data</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.devBtnLoad} onPress={loadDemoData} activeOpacity={0.7}>
-            <Text style={styles.devBtnLoadText}>Load Demo Data</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       {/* ── Greeting ─────────────────────────────────────────────────── */}
       <View style={styles.greeting}>
