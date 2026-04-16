@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity,
-  StyleSheet, Switch, Alert,
+  StyleSheet, Switch, Alert, Modal, Pressable,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
 import { PrimaryButton } from '../components/shared';
 import { useApp } from '../context/AppContext';
@@ -14,11 +15,17 @@ const FREQUENCIES = Object.values(ChoreFrequency);
 export default function AddChoreScreen({ navigation }) {
   const { users, currentUserId, activeGroupId, groups, addChore } = useApp();
 
-  const activeGroup = groups.find(g => g.id === activeGroupId);
-  const hasGroup    = !!activeGroup;
+  // Build scope options: Personal + every group the user is in
+  const scopeOptions = [
+    { value: 'personal', label: '👤 Personal', groupId: null },
+    ...groups.map(g => ({ value: g.id, label: `🏠 ${g.name}`, groupId: g.id })),
+  ];
 
-  // If user has no group, force scope to personal
-  const [scope,        setScope]        = useState(hasGroup ? 'group' : 'personal');
+  // Default to active group if one is set, else personal
+  const defaultScope = activeGroupId || 'personal';
+
+  const [scope,        setScope]        = useState(defaultScope);
+  const [scopeOpen,    setScopeOpen]    = useState(false);
   const [name,         setName]         = useState('');
   const [frequency,    setFrequency]    = useState(ChoreFrequency.WEEKLY);
   const [autoRotate,   setAutoRotate]   = useState(true);
@@ -28,10 +35,15 @@ export default function AddChoreScreen({ navigation }) {
   const [dueDateEnd,   setDueDateEnd]   = useState('Wed');
   const [saving,       setSaving]       = useState(false);
 
-  // Members to show in assignee picker (only group members, not just current user)
-  const groupMembers = activeGroup
-    ? users.filter(u => activeGroup.memberIds.includes(u.id))
-    : [{ id: currentUserId, name: 'Me', color: Colors.accent }];
+  // Current scope info
+  const currentScope = scopeOptions.find(o => o.value === scope) || scopeOptions[0];
+  const isPersonal   = currentScope.groupId === null;
+  const targetGroup  = isPersonal ? null : groups.find(g => g.id === currentScope.groupId);
+
+  // Members for the selected group (for manual assignment)
+  const groupMembers = targetGroup
+    ? users.filter(u => targetGroup.memberIds?.includes(u.id))
+    : [];
 
   async function handleSave() {
     if (!name.trim()) {
@@ -44,11 +56,11 @@ export default function AddChoreScreen({ navigation }) {
       await addChore({
         name:         name.trim(),
         frequency,
-        autoRotate:   scope === 'group' ? autoRotate : false,
-        assigneeId:   scope === 'personal'
+        autoRotate:   isPersonal ? false : autoRotate,
+        assigneeId:   isPersonal
                         ? currentUserId
                         : (autoRotate ? currentUserId : selectedUser),
-        groupId:      scope === 'personal' ? null : activeGroupId,
+        groupId:      currentScope.groupId,
         dueDateStart,
         dueDateEnd,
       });
@@ -65,42 +77,19 @@ export default function AddChoreScreen({ navigation }) {
   }
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      {/* Scope: Personal vs Group */}
+      {/* ── Scope dropdown ─────────────────────────────────────── */}
       <Text style={styles.label}>Chore Scope</Text>
-      <View style={styles.segmentRow}>
-        <TouchableOpacity
-          style={[styles.segment, scope === 'personal' && styles.segmentActive]}
-          onPress={() => setScope('personal')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.segmentText, scope === 'personal' && styles.segmentTextActive]}>
-            👤 Personal
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.segment,
-            scope === 'group' && styles.segmentActive,
-            !hasGroup && styles.segmentDisabled,
-          ]}
-          onPress={() => hasGroup && setScope('group')}
-          activeOpacity={0.7}
-          disabled={!hasGroup}
-        >
-          <Text style={[
-            styles.segmentText,
-            scope === 'group' && styles.segmentTextActive,
-            !hasGroup && styles.segmentTextDisabled,
-          ]}>
-            🏠 {hasGroup ? activeGroup.name : 'Group (none)'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      {!hasGroup && (
-        <Text style={styles.hint}>Join or create a group from the Group tab to add group chores.</Text>
-      )}
+      <TouchableOpacity
+        style={styles.dropdown}
+        onPress={() => setScopeOpen(true)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.dropdownText}>{currentScope.label}</Text>
+        <Ionicons name="chevron-down" size={18} color={Colors.muted} />
+      </TouchableOpacity>
 
       {/* Name */}
       <Text style={styles.label}>Chore Name</Text>
@@ -154,7 +143,7 @@ export default function AddChoreScreen({ navigation }) {
       <Text style={styles.hint}>The chore can be done any time in this window.</Text>
 
       {/* Assignment (only for group chores) */}
-      {scope === 'group' && (
+      {!isPersonal && (
         <>
           <Text style={styles.label}>Assignment</Text>
           <View style={styles.toggleRow}>
@@ -167,7 +156,7 @@ export default function AddChoreScreen({ navigation }) {
             />
           </View>
 
-          {!autoRotate && (
+          {!autoRotate && groupMembers.length > 0 && (
             <>
               <Text style={[styles.inputLabel, { marginTop: 12 }]}>Assign to</Text>
               <View style={styles.chipRow}>
@@ -208,7 +197,6 @@ export default function AddChoreScreen({ navigation }) {
         />
       </View>
 
-      {/* Save */}
       <PrimaryButton
         title={saving ? 'Saving…' : 'Save Chore ✓'}
         onPress={handleSave}
@@ -220,6 +208,40 @@ export default function AddChoreScreen({ navigation }) {
       </TouchableOpacity>
 
     </ScrollView>
+
+    {/* ── Scope picker modal ─────────────────────────────────────── */}
+    <Modal
+      visible={scopeOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setScopeOpen(false)}
+    >
+      <Pressable style={styles.modalOverlay} onPress={() => setScopeOpen(false)}>
+        <View style={styles.modalMenu}>
+          <Text style={styles.modalTitle}>Choose Scope</Text>
+          {scopeOptions.map(opt => {
+            const selected = opt.value === scope;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.modalItem, selected && styles.modalItemActive]}
+                onPress={() => {
+                  setScope(opt.value);
+                  setScopeOpen(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modalItemText, selected && styles.modalItemTextActive]}>
+                  {opt.label}
+                </Text>
+                {selected && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Pressable>
+    </Modal>
+    </>
   );
 }
 
@@ -234,23 +256,69 @@ const styles = StyleSheet.create({
     padding: 13, color: Colors.text, fontSize: 15,
   },
 
-  /* Scope segmented control */
-  segmentRow:    {
+  /* Dropdown */
+  dropdown: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: 4,
-    gap: 4,
-  },
-  segment:       {
-    flex: 1, paddingVertical: 10, borderRadius: Radius.sm,
+    justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: 14,
   },
-  segmentActive: { backgroundColor: Colors.accent },
-  segmentDisabled: { opacity: 0.4 },
-  segmentText:   { ...Typography.subhead, color: Colors.muted, fontWeight: '600' },
-  segmentTextActive: { color: '#fff' },
-  segmentTextDisabled: { color: Colors.muted },
+  dropdownText: {
+    ...Typography.body,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+
+  /* Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: '#000000AA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  modalMenu: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 16,
+    width: '100%',
+    maxWidth: 360,
+    gap: 6,
+  },
+  modalTitle: {
+    ...Typography.headline,
+    color: Colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalItemActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + '18',
+  },
+  modalItemText: {
+    ...Typography.body,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  modalItemTextActive: {
+    color: Colors.accent,
+  },
 
   chipRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:          {

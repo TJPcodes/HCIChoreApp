@@ -1,6 +1,6 @@
 // src/navigation/AppNavigator.js
 import React from 'react';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,10 +29,15 @@ function HomeStack() {
         options={{
           title: 'ChoreSync',
           headerLeft: () => (
-            <TouchableOpacity onPress={signOut} style={styles.logoutBtn} activeOpacity={0.7}>
-              <Ionicons name="log-out-outline" size={20} color={Colors.muted} />
-            </TouchableOpacity>
+            <Pressable
+              onPress={signOut}
+              hitSlop={10}
+              style={{ backgroundColor: 'transparent', padding: 4 }}
+            >
+              <Ionicons name="log-out-outline" size={22} color={Colors.muted} />
+            </Pressable>
           ),
+          headerLeftContainerStyle: { backgroundColor: 'transparent' },
         }}
       />
       <Stack.Screen name="AddChore" component={AddChoreScreen} options={{ title: 'Add Chore' }} />
@@ -44,6 +49,7 @@ function PersonalStack() {
   return (
     <Stack.Navigator screenOptions={stackOptions}>
       <Stack.Screen name="PersonalMain" component={PersonalScreen} options={{ title: 'My Chores' }} />
+      <Stack.Screen name="AddChore"     component={AddChoreScreen} options={{ title: 'Add Chore' }} />
     </Stack.Navigator>
   );
 }
@@ -66,8 +72,6 @@ function GroupStack() {
   );
 }
 
-// ── Auth stack (shown when logged out) ──────────────────────────────────────
-
 function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -76,11 +80,12 @@ function AuthStack() {
   );
 }
 
-// ── Main Tab Navigator ──────────────────────────────────────────────────────
+// ── Main Tabs ───────────────────────────────────────────────────────────────
 
 function MainTabs() {
   return (
     <Tab.Navigator
+      initialRouteName="Home"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
@@ -104,17 +109,15 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Home"     component={HomeStack}     />
-      <Tab.Screen name="Group"    component={GroupStack}     />
-      <Tab.Screen name="Personal" component={PersonalStack} />
       <Tab.Screen name="Activity" component={ActivityStack} />
+      <Tab.Screen name="Home"     component={HomeStack}     />
+      <Tab.Screen name="Group"    component={GroupStack}    />
+      <Tab.Screen name="Personal" component={PersonalStack} />
     </Tab.Navigator>
   );
 }
 
-// ── Root Navigator ──────────────────────────────────────────────────────────
-// Shows a loading spinner while checking for a stored session,
-// then switches between the auth flow and main app.
+// ── Root ────────────────────────────────────────────────────────────────────
 
 export default function AppNavigator() {
   const { session, loaded } = useApp();
@@ -130,14 +133,15 @@ export default function AppNavigator() {
   return session ? <MainTabs /> : <AuthStack />;
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────
-
 const stackOptions = {
   headerStyle:         { backgroundColor: Colors.surface },
   headerTintColor:     Colors.text,
   headerTitleStyle:    { fontWeight: '700', fontSize: 17 },
   headerShadowVisible: false,
   contentStyle:        { backgroundColor: Colors.bg },
+  // Try to suppress iOS 26 Liquid Glass on header buttons
+  headerLeftContainerStyle:  { backgroundColor: 'transparent' },
+  headerRightContainerStyle: { backgroundColor: 'transparent' },
 };
 
 const styles = StyleSheet.create({
@@ -146,9 +150,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Colors.bg,
-  },
-  logoutBtn: {
-    marginRight: 12,
-    padding: 4,
   },
 });

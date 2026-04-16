@@ -1,8 +1,7 @@
 // src/screens/HomeScreen.js
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
@@ -15,21 +14,21 @@ const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 export default function HomeScreen({ navigation }) {
   const {
     currentUserId, getUserById, markComplete,
-    getVisibleChores, activeGroupId, groups,
+    getAllVisibleChores, groups,
     isDemoLoaded, loadDemoData, clearAll,
   } = useApp();
 
   const currentUser = getUserById(currentUserId);
 
-  // Active group chores + personal chores
-  const visibleChores = getVisibleChores();
+  // All chores: every group user is in + personal chores
+  const visibleChores = getAllVisibleChores();
   const myChores      = visibleChores.filter(c => c.assigneeId === currentUserId);
 
   const nextChore    = myChores.find(c => c.status === ChoreStatus.PENDING || c.status === 'pending');
   const overdueCount = visibleChores.filter(c => c.status === ChoreStatus.OVERDUE || c.status === 'overdue').length;
   const dueSoonCount = visibleChores.filter(c => c.status === ChoreStatus.PENDING || c.status === 'pending').length;
 
-  // Build weekly strip from MY chores only
+  // Build weekly strip from my chores (all groups + personal)
   const dayMap = { 'Mon': 0, 'Tue': 1, 'Wed': 2, 'Thu': 3, 'Fri': 4, 'Sat': 5, 'Sun': 6 };
   const choreDays = Array(7).fill(null);
   const doneDays  = Array(7).fill(false);
@@ -42,8 +41,11 @@ export default function HomeScreen({ navigation }) {
     }
   });
 
-  const activeGroup = groups.find(g => g.id === activeGroupId);
-  const inGroup     = !!activeGroup;
+  function sourceLabel(chore) {
+    if (chore.groupId === null) return 'Personal';
+    const g = groups.find(gr => gr.id === chore.groupId);
+    return g ? g.name : '';
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -69,8 +71,12 @@ export default function HomeScreen({ navigation }) {
       <View style={styles.greeting}>
         <Text style={styles.greetingSub}>Welcome back,</Text>
         <Text style={styles.greetingName}>{currentUser.name} 👋</Text>
-        {inGroup && (
-          <Text style={styles.groupLabel}>🏠 {activeGroup.name}</Text>
+        {groups.length > 0 && (
+          <Text style={styles.groupLabel}>
+            🏠 {groups.length === 1
+              ? `In 1 group`
+              : `In ${groups.length} groups`}
+          </Text>
         )}
       </View>
 
@@ -116,11 +122,14 @@ export default function HomeScreen({ navigation }) {
               <View style={{ flex: 1 }}>
                 <Text style={styles.nextChoreName}>{nextChore.name}</Text>
                 <Text style={styles.nextChoreDate}>
-                  {nextChore.dueDateStart} – {nextChore.dueDateEnd}
-                  {nextChore.groupId === null && '  ·  Personal'}
+                  {nextChore.dueDateStart} – {nextChore.dueDateEnd}  ·  {sourceLabel(nextChore)}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.doneBtn} onPress={() => markComplete(nextChore.id)} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.doneBtn}
+                onPress={() => markComplete(nextChore.id)}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.doneBtnText}>Mark Done ✓</Text>
               </TouchableOpacity>
             </View>
@@ -128,13 +137,13 @@ export default function HomeScreen({ navigation }) {
         </>
       )}
 
-      {/* No chores state */}
+      {/* Empty state */}
       {!nextChore && visibleChores.length === 0 && (
         <>
           <SectionHeader title="No chores yet" style={{ marginTop: 16 }} />
           <Card>
             <Text style={styles.noChoresText}>
-              {inGroup
+              {groups.length > 0
                 ? 'Add a chore to get started.'
                 : "You're not in a group yet. Add a personal chore, or join a group from the Group tab."}
             </Text>
@@ -220,10 +229,8 @@ const styles = StyleSheet.create({
   doneBtn:        { backgroundColor: Colors.green, borderRadius: Radius.sm, paddingHorizontal: 14, paddingVertical: 8 },
   doneBtnText:    { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  /* No chores */
   noChoresText:   { ...Typography.body, color: Colors.muted, textAlign: 'center' },
 
-  /* Quick actions */
   actionsGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   actionBtn:      {
     width: '47%', borderRadius: Radius.md, borderWidth: 1,
