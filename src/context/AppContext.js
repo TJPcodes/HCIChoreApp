@@ -11,7 +11,7 @@ function choreFromDb(row) {
     id:           row.id,
     name:         row.name,
     assigneeId:   row.assignee_id,
-    groupId:      row.group_id,      // null = personal chore
+    groupId:      row.group_id,
     frequency:    row.frequency,
     autoRotate:   row.auto_rotate,
     dueDateStart: row.due_date_start,
@@ -90,17 +90,16 @@ export function AppProvider({ children }) {
   }, [activeGroupId]);
 
   // ── 3. Data fetching ─────────────────────────────────────────────────────
+  // `forcedActiveGroupId` bypasses the stale-closure issue after createGroup/joinGroup.
 
-  async function fetchData(userId) {
+  async function fetchData(userId, forcedActiveGroupId) {
     try {
-      // a) Current user's profile
       const { data: myProfile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      // b) Groups the user belongs to
       const { data: memberships } = await supabase
         .from('group_members')
         .select('group_id')
@@ -108,9 +107,10 @@ export function AppProvider({ children }) {
 
       const groupIds = (memberships || []).map(m => m.group_id);
 
-      // c) Group details + members (if any groups exist)
       let groups = [];
-      let users  = [{ id: myProfile.id, name: myProfile.name, color: myProfile.color }];
+      let users  = myProfile
+        ? [{ id: myProfile.id, name: myProfile.name, color: myProfile.color }]
+        : [];
 
       if (groupIds.length > 0) {
         const { data: groupRows } = await supabase
@@ -141,13 +141,13 @@ export function AppProvider({ children }) {
         }));
       }
 
-      // d) Determine active group (first group, or null if none)
-      let newActiveGroupId = activeGroupId;
+      // Determine active group (explicit override > current > first group > null)
+      let newActiveGroupId = forcedActiveGroupId ?? activeGroupId;
       if (!newActiveGroupId || !groupIds.includes(newActiveGroupId)) {
         newActiveGroupId = groupIds[0] || null;
       }
 
-      // e) Chores — fetch both group chores and personal chores
+      // Chores: all groups the user is in + personal chores
       let chores = [];
 
       if (groupIds.length > 0) {
@@ -166,7 +166,7 @@ export function AppProvider({ children }) {
 
       chores = [...chores, ...(personalChoreRows || [])].map(choreFromDb);
 
-      // f) Activity for active group
+      // Activity for active group
       let activity = [];
       if (newActiveGroupId) {
         const { data: activityRows } = await supabase
@@ -210,8 +210,8 @@ export function AppProvider({ children }) {
     }
   }
 
-  async function refreshData() {
-    if (session?.user) await fetchData(session.user.id);
+  async function refreshData(forcedActiveGroupId) {
+    if (session?.user) await fetchData(session.user.id, forcedActiveGroupId);
   }
 
   // ── 4. Helpers ───────────────────────────────────────────────────────────
@@ -228,21 +228,18 @@ export function AppProvider({ children }) {
     return state.chores.filter(c => c.groupId === groupId);
   }
 
-  /** Personal chores = no group, assigned to current user */
   function getPersonalChores() {
     return state.chores.filter(
       c => c.groupId === null && c.assigneeId === state.currentUserId
     );
   }
 
-  /** Everything relevant to Home screen: active group chores + personal chores */
-  function getVisibleChores() {
-    return state.chores.filter(
-      c => c.groupId === activeGroupId || (c.groupId === null && c.assigneeId === state.currentUserId)
-    );
+  /** All chores user can see: every group they're in + personal */
+  function getAllVisibleChores() {
+    return state.chores; // already filtered to (all my groups) ∪ (my personal) by fetchData
   }
 
-  /** All chores assigned to me, from any group or personal */
+  /** All chores assigned to me from any group or personal */
   function getMyChores() {
     return state.chores.filter(c => c.assigneeId === state.currentUserId);
   }
@@ -251,7 +248,7 @@ export function AppProvider({ children }) {
 
   async function addActivity(msg, type = 'info', groupId = null) {
     const targetGroupId = groupId || activeGroupId;
-    if (!targetGroupId) return; // no group, no activity (personal chores don't log)
+    if (!targetGroupId) return;
     await supabase.from('activity').insert({
       group_id:   targetGroupId,
       type,
@@ -271,15 +268,15 @@ export function AppProvider({ children }) {
 
     if (error) { console.error('createGroup:', error); throw error; }
 
-    await supabase.from('group_members').insert({
+    const { error: memErr } = await supabase.from('group_members').insert({
       group_id: group.id,
       user_id:  state.currentUserId,
       role:     'admin',
     });
+    if (memErr) { console.error('createGroup member:', memErr); throw memErr; }
 
-    setActiveGroupId(group.id);
     await addActivity(`Group "${name}" created`, 'added', group.id);
-    await refreshData();
+    await refreshData(group.id);  // ← force active to new group
     return group;
   }
 
@@ -287,7 +284,6 @@ export function AppProvider({ children }) {
     const code = inviteCode.trim().toLowerCase();
     if (!code) throw new Error('Please enter an invite code.');
 
-    // Look up group by invite code
     const { data: group, error: lookupErr } = await supabase
       .from('groups')
       .select('*')
@@ -297,7 +293,6 @@ export function AppProvider({ children }) {
     if (lookupErr) throw lookupErr;
     if (!group)    throw new Error('No group found with that code.');
 
-    // Check if already a member
     const { data: existing } = await supabase
       .from('group_members')
       .select('id')
@@ -306,22 +301,19 @@ export function AppProvider({ children }) {
       .maybeSingle();
 
     if (existing) {
-      setActiveGroupId(group.id);
-      await refreshData();
+      await refreshData(group.id);
       return { group, alreadyMember: true };
     }
 
-    // Insert membership
     const { error: joinErr } = await supabase
       .from('group_members')
       .insert({ group_id: group.id, user_id: state.currentUserId, role: 'member' });
 
     if (joinErr) throw joinErr;
 
-    setActiveGroupId(group.id);
     const user = getUserById(state.currentUserId);
     await addActivity(`${user.name} joined the group`, 'added', group.id);
-    await refreshData();
+    await refreshData(group.id);
     return { group, alreadyMember: false };
   }
 
@@ -329,16 +321,37 @@ export function AppProvider({ children }) {
     setActiveGroupId(groupId);
   }
 
+  async function leaveGroup(groupId) {
+    // Log leave event BEFORE removing membership (so RLS still allows insert)
+    const user = getUserById(state.currentUserId);
+    await addActivity(`${user.name} left the group`, 'info', groupId);
+
+    const { error } = await supabase
+      .from('group_members')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('user_id', state.currentUserId);
+
+    if (error) { console.error('leaveGroup:', error); throw error; }
+
+    // If we just left the active group, switch to another or none
+    let nextActive = activeGroupId;
+    if (activeGroupId === groupId) {
+      const remaining = state.groups.filter(g => g.id !== groupId);
+      nextActive = remaining[0]?.id || null;
+    }
+    await refreshData(nextActive);
+  }
+
   async function deleteGroup(groupId) {
     await supabase.from('groups').delete().eq('id', groupId);
-    if (activeGroupId === groupId) setActiveGroupId(null);
-    await refreshData();
+    const nextActive = activeGroupId === groupId ? null : activeGroupId;
+    await refreshData(nextActive);
   }
 
   // ── 7. Chore actions ─────────────────────────────────────────────────────
 
   async function addChore(chore) {
-    // chore.groupId can be null for personal chores
     const groupId = chore.groupId === undefined ? activeGroupId : chore.groupId;
 
     const { data: newChore, error } = await supabase
@@ -400,7 +413,7 @@ export function AppProvider({ children }) {
   }
 
   async function sendNudge(chore) {
-    if (!chore.groupId) return; // can't nudge personal chores
+    if (!chore.groupId) return;
     await addActivity(`Anonymous nudge sent about "${chore.name}"`, 'nudge', chore.groupId);
     await refreshData();
   }
@@ -450,8 +463,7 @@ export function AppProvider({ children }) {
       { type: 'added', msg: 'Demo data loaded', group_id: group.id, created_by: state.currentUserId },
     ]);
 
-    setActiveGroupId(group.id);
-    await refreshData();
+    await refreshData(group.id);
   }
 
   async function clearAll() {
@@ -459,7 +471,6 @@ export function AppProvider({ children }) {
     if (demoGroup) {
       await supabase.from('groups').delete().eq('id', demoGroup.id);
     }
-    // Also delete personal chores
     await supabase
       .from('chores')
       .delete()
@@ -471,36 +482,31 @@ export function AppProvider({ children }) {
   // ── 10. Context value ────────────────────────────────────────────────────
 
   const value = {
-    // Auth
     session,
     signOut,
 
-    // State
     ...state,
     activeGroupId,
     loaded,
 
-    // Helpers
     getUserById,
     getActiveGroup,
     getChoresForGroup,
     getPersonalChores,
-    getVisibleChores,
+    getAllVisibleChores,
     getMyChores,
 
-    // Group actions
     createGroup,
     joinGroup,
     switchGroup,
+    leaveGroup,
     deleteGroup,
 
-    // Chore actions
     addChore,
     markComplete,
     deleteChore,
     sendNudge,
 
-    // Dev
     isDemoLoaded,
     loadDemoData,
     clearAll,

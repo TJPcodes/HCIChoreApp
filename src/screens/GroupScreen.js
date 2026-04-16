@@ -1,8 +1,8 @@
 // src/screens/GroupScreen.js
 import React, { useState, useLayoutEffect } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
-  StyleSheet, Alert,
+  View, Text, FlatList, TouchableOpacity, ScrollView,
+  StyleSheet, Alert, Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
@@ -12,32 +12,36 @@ import { useApp } from '../context/AppContext';
 
 export default function GroupScreen({ navigation }) {
   const {
-    chores, users, activeGroupId, groups,
+    users, activeGroupId, groups, switchGroup,
     getUserById, getChoresForGroup, markComplete, sendNudge,
   } = useApp();
 
-  const [nudged, setNudged]           = useState({});
+  const [nudged, setNudged]             = useState({});
   const [modalVisible, setModalVisible] = useState(false);
 
-  const activeGroup = groups.find(g => g.id === activeGroupId);
-  const hasGroups   = groups.length > 0;
+  const hasGroups = groups.length > 0;
 
-  // ── Header: invite button (only when in a group) ─────────────────────────
+  // Defensive: if activeGroupId is stale, fall back to first group
+  const activeGroup = groups.find(g => g.id === activeGroupId) || groups[0] || null;
+
+  // ── Header button (only when in a group) ─────────────────────────────────
   useLayoutEffect(() => {
     navigation.setOptions({
+      title: activeGroup ? activeGroup.name : 'Group',
       headerLeft: hasGroups
         ? () => (
-            <TouchableOpacity
+            <Pressable
               onPress={() => setModalVisible(true)}
-              style={styles.headerBtn}
-              activeOpacity={0.7}
+              hitSlop={10}
+              style={{ backgroundColor: 'transparent', padding: 4 }}
             >
               <Ionicons name="person-add-outline" size={22} color={Colors.accent} />
-            </TouchableOpacity>
+            </Pressable>
           )
         : undefined,
+      headerLeftContainerStyle: { backgroundColor: 'transparent' },
     });
-  }, [navigation, hasGroups]);
+  }, [navigation, hasGroups, activeGroup]);
 
   // ── Empty state: no groups ───────────────────────────────────────────────
   if (!hasGroups) {
@@ -69,10 +73,10 @@ export default function GroupScreen({ navigation }) {
     );
   }
 
-  // ── Normal state: in a group ─────────────────────────────────────────────
-  const groupChores  = getChoresForGroup(activeGroupId);
+  // ── Normal state ─────────────────────────────────────────────────────────
+  const groupChores  = activeGroup ? getChoresForGroup(activeGroup.id) : [];
   const groupMembers = activeGroup
-    ? users.filter(u => activeGroup.memberIds.includes(u.id))
+    ? users.filter(u => activeGroup.memberIds?.includes(u.id))
     : [];
 
   const completed = groupChores.filter(c => c.status === 'completed').length;
@@ -130,23 +134,58 @@ export default function GroupScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.groupName}>🏠 {activeGroup.name}</Text>
-          <Text style={styles.headerSub}>{completed}/{total} tasks completed this week</Text>
+
+      {/* ── Group Switcher Pills (only if 2+ groups) ────────────── */}
+      {groups.length > 1 && (
+        <View style={styles.switcherWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.switcherContent}
+          >
+            {groups.map(g => {
+              const isActive = g.id === activeGroup?.id;
+              return (
+                <TouchableOpacity
+                  key={g.id}
+                  style={[styles.pill, isActive && styles.pillActive]}
+                  onPress={() => switchGroup(g.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
+                    🏠 {g.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
-        <ProgressRing progress={progress} size={52} />
-      </View>
+      )}
 
-      <View style={styles.membersRow}>
-        {groupMembers.map(m => (
-          <View key={m.id} style={styles.memberItem}>
-            <Avatar name={m.name} color={m.color} size={36} />
-            <Text style={styles.memberName}>{m.name}</Text>
+      {/* ── Header ──────────────────────────────────────────────── */}
+      {activeGroup && (
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.groupName}>🏠 {activeGroup.name}</Text>
+            <Text style={styles.headerSub}>{completed}/{total} tasks completed this week</Text>
           </View>
-        ))}
-      </View>
+          <ProgressRing progress={progress} size={52} />
+        </View>
+      )}
 
+      {/* ── Members ─────────────────────────────────────────────── */}
+      {groupMembers.length > 0 && (
+        <View style={styles.membersRow}>
+          {groupMembers.map(m => (
+            <View key={m.id} style={styles.memberItem}>
+              <Avatar name={m.name} color={m.color} size={36} />
+              <Text style={styles.memberName}>{m.name}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* ── Chores ──────────────────────────────────────────────── */}
       <FlatList
         data={groupChores}
         keyExtractor={c => c.id}
@@ -175,14 +214,13 @@ export default function GroupScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: Colors.bg },
-  headerBtn:   { marginLeft: 12, padding: 4 },
 
   /* Empty state */
-  emptyContainer: { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center' },
-  emptyContent:   { padding: 32, alignItems: 'center' },
-  emptyIcon:      { fontSize: 56, marginBottom: 16 },
-  emptyTitle:     { ...Typography.title, color: Colors.text, textAlign: 'center', marginBottom: 8 },
-  emptyText:      { ...Typography.body, color: Colors.muted, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
+  emptyContainer:  { flex: 1, backgroundColor: Colors.bg, justifyContent: 'center' },
+  emptyContent:    { padding: 32, alignItems: 'center' },
+  emptyIcon:       { fontSize: 56, marginBottom: 16 },
+  emptyTitle:      { ...Typography.title, color: Colors.text, textAlign: 'center', marginBottom: 8 },
+  emptyText:       { ...Typography.body, color: Colors.muted, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   emptyBtnPrimary: {
     flexDirection: 'row',
     backgroundColor: Colors.accent,
@@ -193,13 +231,35 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyBtnPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  emptyHint: {
-    ...Typography.caption,
-    color: Colors.muted,
-    textAlign: 'center',
-    marginTop: 24,
-    lineHeight: 18,
+  emptyHint:           {
+    ...Typography.caption, color: Colors.muted,
+    textAlign: 'center', marginTop: 24, lineHeight: 18,
   },
+
+  /* Switcher */
+  switcherWrap: {
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  switcherContent: {
+    padding: 12,
+    gap: 8,
+  },
+  pill: {
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  pillActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + '22',
+  },
+  pillText: { ...Typography.subhead, color: Colors.muted, fontWeight: '600' },
+  pillTextActive: { color: Colors.accent },
 
   /* Normal state */
   header:      {

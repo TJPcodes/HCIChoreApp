@@ -9,13 +9,18 @@ import { Colors, Typography, Radius } from '../theme';
 import { useApp } from '../context/AppContext';
 
 /**
- * One modal that handles:
- *   - Showing current group's invite code (when in a group)
- *   - Creating a new group
- *   - Joining a group via invite code
+ * Unified group modal:
+ *   - Current group invite code + share
+ *   - Leave current group
+ *   - Switch between your groups
+ *   - Create a new group
+ *   - Join a group via invite code
  */
 export default function GroupModal({ visible, onClose }) {
-  const { activeGroupId, groups, createGroup, joinGroup } = useApp();
+  const {
+    activeGroupId, groups, switchGroup,
+    createGroup, joinGroup, leaveGroup,
+  } = useApp();
 
   const [newGroupName, setNewGroupName] = useState('');
   const [joinCode,     setJoinCode]     = useState('');
@@ -49,11 +54,10 @@ export default function GroupModal({ visible, onClose }) {
     setBusy(true);
     try {
       await createGroup(newGroupName.trim());
-      setNewGroupName('');
       Alert.alert('Group created! 🎉', `"${newGroupName.trim()}" is now your active group.`);
       closeAndReset();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not create group.');
+      Alert.alert('Error', err.message || 'Could not create group. Please try again.');
     } finally {
       setBusy(false);
     }
@@ -72,14 +76,46 @@ export default function GroupModal({ visible, onClose }) {
       } else {
         Alert.alert('Joined! 🎉', `Welcome to "${group.name}".`);
       }
-      setJoinCode('');
       closeAndReset();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Could not join group.');
+      Alert.alert('Error', err.message || 'Could not join group. Please try again.');
     } finally {
       setBusy(false);
     }
   }
+
+  function handleSwitch(groupId) {
+    switchGroup(groupId);
+    closeAndReset();
+  }
+
+  function handleLeave() {
+    if (!activeGroup) return;
+    Alert.alert(
+      'Leave group?',
+      `You'll lose access to "${activeGroup.name}" and its chores. You can rejoin later with an invite code.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true);
+            try {
+              await leaveGroup(activeGroup.id);
+              closeAndReset();
+            } catch (err) {
+              Alert.alert('Error', err.message || 'Could not leave group.');
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  const otherGroups = groups.filter(g => g.id !== activeGroupId);
 
   return (
     <Modal
@@ -91,7 +127,6 @@ export default function GroupModal({ visible, onClose }) {
       <View style={styles.overlay}>
         <View style={styles.sheet}>
 
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.title}>Groups</Text>
             <TouchableOpacity onPress={closeAndReset} style={styles.closeBtn}>
@@ -101,7 +136,7 @@ export default function GroupModal({ visible, onClose }) {
 
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
-            {/* ── Current group invite code ─────────────────────────── */}
+            {/* ── Current group ──────────────────────────────────────── */}
             {activeGroup && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Invite to "{activeGroup.name}"</Text>
@@ -115,10 +150,42 @@ export default function GroupModal({ visible, onClose }) {
                   <Ionicons name="share-outline" size={18} color="#fff" />
                   <Text style={styles.shareBtnText}>Share Invite</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.leaveBtn}
+                  onPress={handleLeave}
+                  disabled={busy}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="exit-outline" size={16} color={Colors.red} />
+                  <Text style={styles.leaveBtnText}>Leave Group</Text>
+                </TouchableOpacity>
               </View>
             )}
 
-            {activeGroup && <View style={styles.divider} />}
+            {/* ── Switch to another group ────────────────────────────── */}
+            {otherGroups.length > 0 && (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Switch Group</Text>
+                  {otherGroups.map(g => (
+                    <TouchableOpacity
+                      key={g.id}
+                      style={styles.groupRow}
+                      onPress={() => handleSwitch(g.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="home-outline" size={18} color={Colors.accent} />
+                      <Text style={styles.groupRowText}>{g.name}</Text>
+                      <Ionicons name="chevron-forward" size={16} color={Colors.muted} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+
+            <View style={styles.divider} />
 
             {/* ── Create new group ──────────────────────────────────── */}
             <View style={styles.section}>
@@ -146,7 +213,7 @@ export default function GroupModal({ visible, onClose }) {
 
             <View style={styles.divider} />
 
-            {/* ── Join existing group ───────────────────────────────── */}
+            {/* ── Join group ─────────────────────────────────────────── */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Join a Group</Text>
               <Text style={styles.sectionHint}>Got an invite code from a friend?</Text>
@@ -179,8 +246,6 @@ export default function GroupModal({ visible, onClose }) {
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -191,7 +256,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
-    maxHeight: '88%',
+    maxHeight: '90%',
     paddingBottom: 24,
   },
   header: {
@@ -203,29 +268,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  title: {
-    ...Typography.title,
-    color: Colors.text,
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  content: {
-    padding: 20,
-    gap: 8,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionTitle: {
-    ...Typography.headline,
-    color: Colors.text,
-  },
-  sectionHint: {
-    ...Typography.caption,
-    color: Colors.muted,
-    marginTop: -4,
-  },
+  title:    { ...Typography.title, color: Colors.text },
+  closeBtn: { padding: 4 },
+  content:  { padding: 20, gap: 8 },
+  section:  { gap: 10 },
+  sectionTitle: { ...Typography.headline, color: Colors.text },
+  sectionHint:  { ...Typography.caption, color: Colors.muted, marginTop: -4 },
   codeBox: {
     backgroundColor: Colors.surface,
     borderWidth: 1,
@@ -251,15 +299,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  shareBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
+  shareBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  leaveBtn: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    padding: 10,
+    marginTop: 4,
   },
+  leaveBtnText: { color: Colors.red, fontWeight: '600', fontSize: 13 },
   divider: {
     height: 1,
     backgroundColor: Colors.border,
     marginVertical: 16,
+  },
+  groupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: 12,
+  },
+  groupRowText: {
+    flex: 1,
+    ...Typography.subhead,
+    color: Colors.text,
+    fontWeight: '600',
   },
   input: {
     backgroundColor: Colors.card,
@@ -275,12 +344,6 @@ const styles = StyleSheet.create({
     padding: 13,
     alignItems: 'center',
   },
-  actionBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  disabled: {
-    opacity: 0.6,
-  },
+  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  disabled: { opacity: 0.6 },
 });
