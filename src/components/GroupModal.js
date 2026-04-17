@@ -8,14 +8,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Radius } from '../theme';
 import { useApp } from '../context/AppContext';
 
-/**
- * Unified group modal:
- *   - Current group invite code + share
- *   - Leave current group
- *   - Switch between your groups
- *   - Create a new group
- *   - Join a group via invite code
- */
+const EMOJI_OPTIONS = [
+  '🏠', '🏡', '🏢', '🏘️', '🛖',
+  '🧹', '🧼', '🧽', '🫧', '🪣',
+  '🍳', '🛏️', '🛋️', '🚿', '🪴',
+  '🐶', '🐱', '🎓', '💼', '⭐',
+];
+
 export default function GroupModal({ visible, onClose }) {
   const {
     activeGroupId, groups,
@@ -23,13 +22,15 @@ export default function GroupModal({ visible, onClose }) {
   } = useApp();
 
   const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupEmoji, setNewGroupEmoji] = useState('🏠');
   const [joinCode,     setJoinCode]     = useState('');
-  const [busyAction,   setBusyAction]   = useState(null); // 'create' | 'join' | null
+  const [busyAction,   setBusyAction]   = useState(null);
 
   const activeGroup = groups.find(g => g.id === activeGroupId);
 
   function closeAndReset() {
     setNewGroupName('');
+    setNewGroupEmoji('🏠');
     setJoinCode('');
     setBusyAction(null);
     onClose();
@@ -53,7 +54,7 @@ export default function GroupModal({ visible, onClose }) {
     }
     setBusyAction('create');
     try {
-      await createGroup(newGroupName.trim());
+      await createGroup(newGroupName.trim(), newGroupEmoji);
       Alert.alert('Group created! 🎉', `"${newGroupName.trim()}" is now your active group.`);
       closeAndReset();
     } catch (err) {
@@ -95,14 +96,14 @@ export default function GroupModal({ visible, onClose }) {
           text: 'Leave',
           style: 'destructive',
           onPress: async () => {
-            setBusyAction(true);
+            setBusyAction('leave');
             try {
               await leaveGroup(activeGroup.id);
               closeAndReset();
             } catch (err) {
               Alert.alert('Error', err.message || 'Could not leave group.');
             } finally {
-              setBusyAction(false);
+              setBusyAction(null);
             }
           },
         },
@@ -132,7 +133,9 @@ export default function GroupModal({ visible, onClose }) {
             {/* ── Current group ──────────────────────────────────────── */}
             {activeGroup && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Invite to "{activeGroup.name}"</Text>
+                <Text style={styles.sectionTitle}>
+                  Invite to "{activeGroup.emoji || '🏠'} {activeGroup.name}"
+                </Text>
                 <Text style={styles.sectionHint}>Share this code so others can join:</Text>
                 <View style={styles.codeBox}>
                   <Text selectable style={styles.codeText}>
@@ -161,6 +164,24 @@ export default function GroupModal({ visible, onClose }) {
             {/* ── Create new group ──────────────────────────────────── */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Create New Group</Text>
+
+              <Text style={styles.sectionHint}>Pick an icon</Text>
+              <View style={styles.emojiGrid}>
+                {EMOJI_OPTIONS.map(e => {
+                  const selected = newGroupEmoji === e;
+                  return (
+                    <TouchableOpacity
+                      key={e}
+                      style={[styles.emojiCell, selected && styles.emojiCellActive]}
+                      onPress={() => setNewGroupEmoji(e)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.emojiText}>{e}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Apartment, Dorm, Family"
@@ -285,22 +306,33 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     marginVertical: 16,
   },
-  groupRow: {
+
+  /* Emoji picker */
+  emojiGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: Colors.card,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  emojiCell: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: 12,
+    backgroundColor: Colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  groupRowText: {
-    flex: 1,
-    ...Typography.subhead,
-    color: Colors.text,
-    fontWeight: '600',
+  emojiCellActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + '22',
+    borderWidth: 2,
   },
+  emojiText: {
+    fontSize: 22,
+  },
+
   input: {
     backgroundColor: Colors.card,
     borderWidth: 1,

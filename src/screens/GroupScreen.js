@@ -196,7 +196,7 @@ export default function GroupScreen({ navigation }) {
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
-                    🏠 {g.name}
+                    {g.emoji || '🏠'} {g.name}
                   </Text>
                 </TouchableOpacity>
               );
@@ -209,7 +209,7 @@ export default function GroupScreen({ navigation }) {
       {activeGroup && (
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.groupName}>🏠 {activeGroup.name}</Text>
+            <Text style={styles.groupName}>{activeGroup.emoji || '🏠'} {activeGroup.name}</Text>
             <Text style={styles.headerSub}>{completed}/{total} tasks completed this week</Text>
           </View>
           <ProgressRing progress={progress} size={52} />

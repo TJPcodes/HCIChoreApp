@@ -51,9 +51,9 @@ export default function HomeScreen({ navigation }) {
   });
 
   function sourceLabel(chore) {
-    if (chore.groupId === null) return 'Personal';
+    if (chore.groupId === null) return '👤 Personal';
     const g = groups.find(gr => gr.id === chore.groupId);
-    return g ? g.name : '';
+    return g ? `${g.emoji || '🏠'} ${g.name}` : '';
   }
 
   return (
@@ -65,9 +65,9 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.greetingName}>{currentUser.name} 👋</Text>
         {groups.length > 0 && (
           <Text style={styles.groupLabel}>
-            🏠 {groups.length === 1
-              ? `In 1 group`
-              : `In ${groups.length} groups`}
+            {groups.length === 1
+              ? `${groups[0].emoji || '🏠'} In 1 group`
+              : `🏠 In ${groups.length} groups`}
           </Text>
         )}
       </View>

@@ -34,12 +34,16 @@ function choreFromDb(row) {
   };
 }
 
-function activityFromDb(row) {
+function activityFromDb(row, groupsMap) {
+  const group = groupsMap?.[row.group_id];
   return {
-    id:   row.id,
-    type: row.type,
-    msg:  row.msg,
-    time: timeAgo(row.created_at),
+    id:        row.id,
+    type:      row.type,
+    msg:       row.msg,
+    time:      timeAgo(row.created_at),
+    groupId:   row.group_id,
+    groupName: group?.name || '',
+    groupEmoji:group?.emoji || '🏠',
   };
 }
 
@@ -96,13 +100,6 @@ export function AppProvider({ children }) {
     }
   }, [session]);
 
-  // Re-fetch activity when active group changes
-  useEffect(() => {
-    if (session?.user && activeGroupId) {
-      fetchActivity(activeGroupId);
-    }
-  }, [activeGroupId]);
-
   // ── 3. Data fetching ─────────────────────────────────────────────────────
   // `forcedActiveGroupId` bypasses the stale-closure issue after createGroup/joinGroup.
 
@@ -150,6 +147,7 @@ export function AppProvider({ children }) {
         groups = (groupRows || []).map(g => ({
           id:         g.id,
           name:       g.name,
+          emoji:      g.emoji || '🏠',
           inviteCode: g.invite_code,
           memberIds:  (allMemberships || [])
             .filter(m => m.group_id === g.id)
@@ -182,16 +180,21 @@ export function AppProvider({ children }) {
 
       chores = [...chores, ...(personalChoreRows || [])].map(choreFromDb);
 
-      // Activity for active group
+      // Activity for ALL groups the user is in (last 25)
       let activity = [];
-      if (newActiveGroupId) {
+      if (groupIds.length > 0) {
         const { data: activityRows } = await supabase
           .from('activity')
           .select('*')
-          .eq('group_id', newActiveGroupId)
+          .in('group_id', groupIds)
           .order('created_at', { ascending: false })
-          .limit(50);
-        activity = (activityRows || []).map(activityFromDb);
+          .limit(25);
+
+        // Build a quick lookup so activityFromDb can tag each item with its group
+        const groupsMap = {};
+        groups.forEach(g => { groupsMap[g.id] = g; });
+
+        activity = (activityRows || []).map(r => activityFromDb(r, groupsMap));
       }
 
       setState({
@@ -206,23 +209,6 @@ export function AppProvider({ children }) {
     } catch (err) {
       console.error('fetchData error:', err);
       setLoaded(true);
-    }
-  }
-
-  async function fetchActivity(groupId) {
-    try {
-      const { data: activityRows } = await supabase
-        .from('activity')
-        .select('*')
-        .eq('group_id', groupId)
-        .order('created_at', { ascending: false })
-        .limit(50);
-      setState(prev => ({
-        ...prev,
-        activity: (activityRows || []).map(activityFromDb),
-      }));
-    } catch (err) {
-      console.error('fetchActivity error:', err);
     }
   }
 
@@ -275,10 +261,10 @@ export function AppProvider({ children }) {
 
   // ── 6. Group actions ─────────────────────────────────────────────────────
 
-  async function createGroup(name) {
+  async function createGroup(name, emoji = '🏠') {
     const { data: group, error } = await supabase
       .from('groups')
-      .insert({ name, created_by: state.currentUserId })
+      .insert({ name, emoji, created_by: state.currentUserId })
       .select()
       .single();
 
@@ -449,7 +435,7 @@ export function AppProvider({ children }) {
   async function loadDemoData() {
     const { data: group, error: gErr } = await supabase
       .from('groups')
-      .insert({ name: DEMO_GROUP_NAME, created_by: state.currentUserId })
+      .insert({ name: DEMO_GROUP_NAME, emoji: '🏠', created_by: state.currentUserId })
       .select()
       .single();
 

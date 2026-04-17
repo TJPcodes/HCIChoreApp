@@ -37,9 +37,9 @@ export default function PersonalScreen() {
     : 0;
 
   function groupLabel(chore) {
-    if (chore.groupId === null) return 'Personal';
+    if (chore.groupId === null) return '👤 Personal';
     const g = groups.find(gr => gr.id === chore.groupId);
-    return g ? g.name : 'Unknown group';
+    return g ? `${g.emoji || '🏠'} ${g.name}` : '🏠 Unknown group';
   }
 
   function renderChore(chore) {
@@ -56,7 +56,7 @@ export default function PersonalScreen() {
               {chore.autoRotate ? '  🔄 auto-rotate' : ''}
             </Text>
             <Text style={styles.choreSource}>
-              {chore.groupId === null ? '👤' : '🏠'} {groupLabel(chore)}
+              {groupLabel(chore)}
             </Text>
           </View>
           <TouchableOpacity onPress={() => markComplete(chore.id)} activeOpacity={0.7}>
@@ -82,7 +82,7 @@ export default function PersonalScreen() {
               📅 {upcomingLabel(chore.startWeekOffset)} · {chore.dueDateStart}–{chore.dueDateEnd}
             </Text>
             <Text style={styles.choreSource}>
-              {chore.groupId === null ? '👤' : '🏠'} {groupLabel(chore)}
+              {groupLabel(chore)}
             </Text>
           </View>
         </View>

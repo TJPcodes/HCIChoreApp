@@ -5,29 +5,37 @@ import {
 import { Colors, Typography, Radius } from '../theme';
 import { useApp } from '../context/AppContext';
 
-// Map activity types to icons and colors
+// Every activity type gets an emoji + color. Fallback ensures nothing is blank.
 const TYPE_STYLES = {
   completed: { icon: '✅', color: '#34C78A' },
   rotated:   { icon: '🔄', color: '#4F8EF7' },
   due_soon:  { icon: '⚠️', color: '#F5A623' },
-  added:     { icon: '➕', color: '#2DD4BF' },
+  added:     { icon: '🆕', color: '#dd1717' },
   nudge:     { icon: '👋', color: '#FBBF24' },
   info:      { icon: 'ℹ️', color: '#818CF8' },
 };
+const FALLBACK_STYLE = { icon: '📌', color: '#818CF8' };
 
 export default function ActivityScreen({ navigation }) {
   const { activity } = useApp();
 
   function renderItem({ item }) {
-    const style = TYPE_STYLES[item.type] || TYPE_STYLES.info;
+    const style = TYPE_STYLES[item.type] || FALLBACK_STYLE;
     return (
       <View style={styles.row}>
         <View style={[styles.iconWrap, { backgroundColor: style.color + '22' }]}>
-          <Text style={styles.icon}>{item.icon || style.icon}</Text>
+          <Text style={styles.icon}>{style.icon}</Text>
         </View>
         <View style={styles.textWrap}>
           <Text style={styles.msg}>{item.msg}</Text>
-          <Text style={styles.time}>{item.time}</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.time}>{item.time}</Text>
+            {item.groupName ? (
+              <Text style={styles.groupTag}>
+                {item.groupEmoji || '🏠'} {item.groupName}
+              </Text>
+            ) : null}
+          </View>
         </View>
       </View>
     );
@@ -86,7 +94,9 @@ const styles = StyleSheet.create({
   icon:         { fontSize: 16 },
   textWrap:     { flex: 1 },
   msg:          { ...Typography.subhead, color: Colors.text },
-  time:         { ...Typography.caption, color: Colors.muted, marginTop: 3 },
+  metaRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
+  time:         { ...Typography.caption, color: Colors.muted },
+  groupTag:     { ...Typography.caption, color: Colors.accent, fontWeight: '600' },
   separator:    { height: 8 },
   emptyWrap:    { padding: 32, alignItems: 'center' },
   emptyText:    { ...Typography.body, color: Colors.muted, textAlign: 'center' },

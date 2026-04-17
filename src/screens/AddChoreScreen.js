@@ -25,7 +25,7 @@ export default function AddChoreScreen({ navigation }) {
   // Build scope options: Personal + every group the user is in
   const scopeOptions = [
     { value: 'personal', label: '👤 Personal', groupId: null },
-    ...groups.map(g => ({ value: g.id, label: `🏠 ${g.name}`, groupId: g.id })),
+    ...groups.map(g => ({ value: g.id, label: `${g.emoji || '🏠'} ${g.name}`, groupId: g.id })),
   ];
 
   // Default to active group if one is set, else personal
