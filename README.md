@@ -8,6 +8,27 @@
 | Tyler Pencinger | tyler.pencinger@ufl.edu |
 | Zachary Pinet | pinetz@ufl.edu |
 
+# ChoreSync
+
+A mobile app for chore coordination in shared households, built for college students and young adults who want fairness without confrontation.
+
+ChoreSync lets roommate groups assign chores, track completion, and send anonymous reminders without anyone having to be the bad guy. Built with React Native and Expo, backed by Supabase for real-time sync across devices.
+
+## Features
+
+- **Group Dashboard** — see all chores, assignees, and status at a glance. Overdue chores are flagged automatically.
+- **Anonymous nudge** — send a one-tap reminder to a roommate without your name attached.
+- **Flexible due windows** — chores have a start and end day, not a single hard deadline.
+- **Auto-rotation** — chores reassign themselves after each completion so nobody has to negotiate every week.
+- **Activity Feed** — a log of completions, rotations, and nudges that keeps everyone in the loop without another group chat.
+- **Personal Dashboard** — just your chores, split into pending, overdue, and complete.
+
+## Built With
+
+- React Native / Expo SDK 54
+- Supabase (auth + real-time database)
+- React Navigation v6
+
 ## Getting the App Running on Your Phone
 
 ### Step 1 — Download Expo Go on your iPhone
